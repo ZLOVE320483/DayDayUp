@@ -189,7 +189,53 @@ class $Proxy0 extends Proxy implements GitHubApiService {
 
 6.2 动态代理总结
 
+- ProxyDemo代码运行中，会动态创建 GitHubApiService 接口的实现类，作为代理对象，执行InvocationHandler 的 invoke 方法。
+- 动态指的是在运行期，而代理指的是实现了GitHubApiService 接口的具体类，称之为代理。
+- 本质上是在运行期，生成了 GitHubApiService 接口的实现类，调用了 InvocationHandler 的 invoke方法。
+
+现在已经解决了最开始提出来的第一个问题，什么是动态代理。
+
+讲解完动态代理，继续回到我们的 ``` retrofit.create(GitHubApiService::class.java) ``` 方法。
 
 
+7. 再看Retrofit.create()方法
+```
+public <T> T create(final Class<T> service) {
+    validateServiceInterface(service);
+    return (T)
+        Proxy.newProxyInstance(
+            service.getClassLoader(), // 1
+            new Class<?>[] {service}, // 2
+            new InvocationHandler() {// 3
+              private final Platform platform = Platform.get();
+              private final Object[] emptyArgs = new Object[0];
+
+              @Override
+              public @Nullable Object invoke(Object proxy, Method method, @Nullable Object[] args)
+                  throws Throwable {
+                // If the method is a method from Object then defer to normal invocation.
+                if (method.getDeclaringClass() == Object.class) { // 4
+                  return method.invoke(this, args);
+                }
+                args = args != null ? args : emptyArgs;
+				// 5
+                return platform.isDefaultMethod(method)
+                    ? platform.invokeDefaultMethod(method, service, proxy, args)
+                    : loadServiceMethod(method).invoke(args);
+              }
+            });
+  }
+```
+注释 1：获取一个 ClassLoader 对象
+
+注释 2：GitHubApiService 的字节码对象传到数组中去
+
+注释 3：InvocationHandler 的 invoke 是关键，从上面动态代理的 Demo 中，我们知道，在GitHubApiService声明的 listRepos方法在调用时，会执行 InvocationHandler 的invoke的方法体。
+
+注释 4：因为有代理类的生成，默认继承 Object 类，所以如果是 Object.class 走，默认调用它的方法
+
+注释 5：如果是默认方法（比如 Java8 ），就执行 platform 的默认方法。否则执行loadServiceMethod方法的invoke方法
+
+追到这里就可以发现 ``` loadServiceMethod(method).invoke(args); ``` 方法是retrofit最为关键的代码，也是本文需要着重分析的代码。
 
 
