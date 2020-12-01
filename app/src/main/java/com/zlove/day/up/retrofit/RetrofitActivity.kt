@@ -26,7 +26,7 @@ class RetrofitActivity : AppCompatActivity() {
             .build()
 
         val service = retrofit.create(GitHubApiService::class.java)
-        val repos = service.listRepos("ZlovE32048")
+        val repos = service.listRepos("ZLOVE32048")
 
         repos.enqueue(object : Callback<List<Any>> {
 
