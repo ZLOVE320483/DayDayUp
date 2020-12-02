@@ -314,3 +314,15 @@ ActivityClientRecord performDestroyActivity(IBinder token, boolean finishing, in
 }
 ```
 那么这个 getNonConfigInstance 参数是在哪里赋值为 true 的呢?
+
+![viewmodel生命周期图](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/viewmodel1.jpg)
+
+通过定位发现：在 ActivityThread.H 收到 RELAUNCH_ACTIVITY 消息时，会走到 performDestroyActivity 方法，并且 在 RELAUNCH_ACTIVITY 消息的消费链上 handleRelaunchActivityInner 方法会把 getNonConfingInstance 赋值为 true。
+在 Activity destroy 执行完之后，立马会执行 handleLaunchActivity 方法去重建 Activity。
+
+![viewmodel生命周期图](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/viewmodel2.jpg)
+
+在创建了新的 Activity 对象之后，就会把 lastNonConfigurationInstances 写入到 Activity 的字段中。因为这里的 lastNonConfigurationInstances 一直是存在 ActivityClientRecord (代码中的r)中的，而 ActivityClientRecord 是维护在 ActivityThread 中的，所以 Activity 对象的销毁和重建不会影响 ActivityThread 中的 ActivityClientRecord 对象，也正是因为这样 ActivityClientRecord 才能持有独立与 Activity 生命周期之外的数据。
+通过上面知道 lastNonConfigurationInstances 在 ComponentActivity 中存储的实际是 Activity 的 ViewModelStore 对象。所以 ViewModelStore 靠着 ActivityClientRecord 就实现了与 Activity 生命周期的无关性。
+
+至此，本文分析完结。
