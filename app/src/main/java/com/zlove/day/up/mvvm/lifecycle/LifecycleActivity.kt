@@ -14,7 +14,12 @@ class LifecycleActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_lifecycle)
 
-        val component = FeedsComponent(this)
-        component.say()
+        val feedsComponent = FeedsComponent()
+        val musicComponent = MusicComponent()
+        lifecycle.addObserver(feedsComponent)
+        lifecycle.addObserver(musicComponent)
+
+        feedsComponent.say()
+        musicComponent.say()
     }
 }
