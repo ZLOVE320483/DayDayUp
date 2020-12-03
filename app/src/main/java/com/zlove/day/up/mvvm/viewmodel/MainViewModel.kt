@@ -1,4 +1,4 @@
-package com.zlove.day.up.mvvm
+package com.zlove.day.up.mvvm.viewmodel
 
 import androidx.lifecycle.ViewModel
 
