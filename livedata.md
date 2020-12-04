@@ -151,3 +151,262 @@ class NetworkLiveData private constructor(context: Context): LiveData<NetworkInf
 > LiveData 内部已经实现了观察者模式，如果你的数据要同时通知几个界面，可以采取这种方式。
 
 > 我们知道 LiveData 数据变化的时候，会回调 Observer 的 onChange 方法，但是回调的前提是 lifecycleOwner（即所依附的 Activity 或者 Fragment） 处于 started 或者 resumed 状态，它才会回调，否则，必须等到 lifecycleOwner 切换到前台的时候，才回调。因此，这对性能方面确实是一个不小的提升。
+
+### 原理解析
+我们知道 livedata 的使用很简单，它是采用观察者模式实现的。
+```
+LiveData.java
+
+    @MainThread
+    public void observe(@NonNull LifecycleOwner owner, @NonNull Observer<? super T> observer) {
+        assertMainThread("observe");
+        if (owner.getLifecycle().getCurrentState() == DESTROYED) {
+            // ignore
+            return;
+        }
+        LifecycleBoundObserver wrapper = new LifecycleBoundObserver(owner, observer);
+        ObserverWrapper existing = mObservers.putIfAbsent(observer, wrapper);
+        if (existing != null && !existing.isAttachedTo(owner)) {
+            throw new IllegalArgumentException("Cannot add the same observer"
+                    + " with different lifecycles");
+        }
+        if (existing != null) {
+            return;
+        }
+        owner.getLifecycle().addObserver(wrapper);
+    }
+```
+observe 方法，总结起来就是：
+
+1. 判断是否已经销毁，如果销毁，直接移除
+
+2. 用 LifecycleBoundObserver 包装传递进来的 observer
+
+3. 是否已经添加过，添加过，直接返回
+
+4. 将包装后的 LifecycleBoundObserver 添加进去
+
+#### LifecycleBoundObserver
+```
+    class LifecycleBoundObserver extends ObserverWrapper implements LifecycleEventObserver {
+        @NonNull
+        final LifecycleOwner mOwner;
+
+        LifecycleBoundObserver(@NonNull LifecycleOwner owner, Observer<? super T> observer) {
+            super(observer);
+            mOwner = owner;
+        }
+
+        @Override
+        boolean shouldBeActive() {
+            return mOwner.getLifecycle().getCurrentState().isAtLeast(STARTED);
+        }
+
+        @Override
+        public void onStateChanged(@NonNull LifecycleOwner source,
+                @NonNull Lifecycle.Event event) {
+            if (mOwner.getLifecycle().getCurrentState() == DESTROYED) {
+                removeObserver(mObserver);
+                return;
+            }
+            activeStateChanged(shouldBeActive());
+        }
+
+        @Override
+        boolean isAttachedTo(LifecycleOwner owner) {
+            return mOwner == owner;
+        }
+
+        @Override
+        void detachObserver() {
+            mOwner.getLifecycle().removeObserver(this);
+        }
+    }
+```
+我们来看一下 LifecycleBoundObserver，继承 ObserverWrapper，实现了 LifecycleEventObserver 接口。而 LifecycleEventObserver 接口又实现了 LifecycleObserver 接口。 它包装了我们外部的 observer，有点类似于代理模式。
+
+Activity 回调周期变化的时候，会回调 onStateChanged ，会先判断 mOwner.getLifecycle().getCurrentState() 是否已经 destroy 了，如果。已经 destroy，直接移除观察者。这也就是为什么我们不需要手动 remove observer 的原因。
+
+如果不是销毁状态，会调用 activeStateChanged 方法 ，携带的参数为 shouldBeActive() 返回的值。
+而当 lifecycle 的 state 为 started 或者 resume 的时候，shouldBeActive 方法的返回值为 true，即表示激活。
+
+```
+    private abstract class ObserverWrapper {
+        final Observer<? super T> mObserver;
+        boolean mActive;
+        int mLastVersion = START_VERSION;
+
+        ObserverWrapper(Observer<? super T> observer) {
+            mObserver = observer;
+        }
+
+        abstract boolean shouldBeActive();
+
+        boolean isAttachedTo(LifecycleOwner owner) {
+            return false;
+        }
+
+        void detachObserver() {
+        }
+
+        void activeStateChanged(boolean newActive) {
+            if (newActive == mActive) {
+                return;
+            }
+            // immediately set active state, so we'd never dispatch anything to inactive
+            // owner
+            mActive = newActive;
+            boolean wasInactive = LiveData.this.mActiveCount == 0;
+            LiveData.this.mActiveCount += mActive ? 1 : -1;
+            if (wasInactive && mActive) {
+                onActive();
+            }
+            if (LiveData.this.mActiveCount == 0 && !mActive) {
+                onInactive();
+            }
+            if (mActive) {
+                dispatchingValue(this);
+            }
+        }
+    }
+```
+activeStateChanged 方法中，，当 newActive 为 true，并且不等于上一次的值，会增加 LiveData 的 mActiveCount 计数。接着可以看到，onActive 会在 mActiveCount 为 1 时触发，onInactive 方法则只会在 mActiveCount 为 0 时触发。即回调 onActive 方法的时候活跃的 observer 恰好为 1，回调 onInactive 方法的时候，没有一个 Observer 处于激活状态。
+
+当 mActive 为 true 时，会促发 dispatchingValue 方法。
+
+```
+    void dispatchingValue(@Nullable ObserverWrapper initiator) {
+        if (mDispatchingValue) {
+            mDispatchInvalidated = true;
+            return;
+        }
+        mDispatchingValue = true;
+        do {
+            mDispatchInvalidated = false;
+            if (initiator != null) {
+                considerNotify(initiator);
+                initiator = null;
+            } else {
+                for (Iterator<Map.Entry<Observer<? super T>, ObserverWrapper>> iterator =
+                        mObservers.iteratorWithAdditions(); iterator.hasNext(); ) {
+                    considerNotify(iterator.next().getValue());
+                    if (mDispatchInvalidated) {
+                        break;
+                    }
+                }
+            }
+        } while (mDispatchInvalidated);
+        mDispatchingValue = false;
+    }
+```
+其中 mDispatchingValue, mDispatchInvalidated 只在 dispatchingValue 方法中使用，显然这两个变量是为了防止重复分发相同的内容。当 initiator 不为 null，只处理当前 observer，为 null 的时候，遍历所有的 obsever，进行分发。
+
+```
+    private void considerNotify(ObserverWrapper observer) {
+        if (!observer.mActive) {
+            return;
+        }
+        // Check latest state b4 dispatch. Maybe it changed state but we didn't get the event yet.
+        //
+        // we still first check observer.active to keep it as the entrance for events. So even if
+        // the observer moved to an active state, if we've not received that event, we better not
+        // notify for a more predictable notification order.
+        if (!observer.shouldBeActive()) {
+            observer.activeStateChanged(false);
+            return;
+        }
+        if (observer.mLastVersion >= mVersion) {
+            return;
+        }
+        observer.mLastVersion = mVersion;
+        observer.mObserver.onChanged((T) mData);
+    }
+```
+如果状态不是在活跃中，直接返回，这也就是为什么当我们的 Activity 处于 onPause， onStop， onDestroy 的时候，不会回调 observer 的 onChange 方法的原因。
+
+判断数据是否是最新，如果是最新，返回，不处理
+
+数据不是最新，回调 mObserver.onChanged 方法。并将 mData 传递过去
+
+```
+    @MainThread
+    protected void setValue(T value) {
+        assertMainThread("setValue");
+        mVersion++;
+        mData = value;
+        dispatchingValue(null);
+    }
+```
+setValue 方法中，首先，断言是主线程，接着 mVersion + 1; 并将 value 赋值给 mData，接着调用 dispatchingValue 方法。dispatchingValue 传递 null，代表处理所有 的 observer。
+
+这个时候如果我们依附的 activity 处于 onPause 或者 onStop 的时候，虽然在 dispatchingValue 方法中直接返回，不会调用 observer 的 onChange 方法。但是当所依附的 activity 重新回到前台的时候，会促发 LifecycleBoundObserver onStateChange 方法，onStateChange 又会调用 dispatchingValue 方法，在该方法中，因为 mLastVersion < mVersion，所以会回调 obsever 的 onChange 方法，这也就是 LiveData 设计得比较巧妙的一个地方
+
+同理，当 activity 处于后台的时候，您多次调用 livedata 的 setValue 方法，最终只会回调 livedata observer 的 onChange 方法一次。
+```
+    protected void postValue(T value) {
+        boolean postTask;
+        synchronized (mDataLock) {
+            postTask = mPendingData == NOT_SET;
+            mPendingData = value;
+        }
+        if (!postTask) {
+            return;
+        }
+        ArchTaskExecutor.getInstance().postToMainThread(mPostValueRunnable);
+    }
+
+    private final Runnable mPostValueRunnable = new Runnable() {
+        @SuppressWarnings("unchecked")
+        @Override
+        public void run() {
+            Object newValue;
+            synchronized (mDataLock) {
+                newValue = mPendingData;
+                mPendingData = NOT_SET;
+            }
+            setValue((T) newValue);
+        }
+    };
+```
+首先，采用同步机制，通过 postTask = mPendingData == NOT_SET 有没有人在处理任务。 true，没人在处理任务， false ，有人在处理任务，有人在处理任务的话，直接返回
+
+调用 AppToolkitTaskExecutor.getInstance().postToMainThread 到主线程执行 mPostValueRunnable 任务。
+
+```
+    @MainThread
+    public void observeForever(@NonNull Observer<? super T> observer) {
+        assertMainThread("observeForever");
+        AlwaysActiveObserver wrapper = new AlwaysActiveObserver(observer);
+        ObserverWrapper existing = mObservers.putIfAbsent(observer, wrapper);
+        if (existing instanceof LiveData.LifecycleBoundObserver) {
+            throw new IllegalArgumentException("Cannot add the same observer"
+                    + " with different lifecycles");
+        }
+        if (existing != null) {
+            return;
+        }
+        wrapper.activeStateChanged(true);
+    }
+
+    private class AlwaysActiveObserver extends ObserverWrapper {
+
+        AlwaysActiveObserver(Observer<? super T> observer) {
+            super(observer);
+        }
+
+        @Override
+        boolean shouldBeActive() {
+            return true;
+        }
+    }
+```
+因为 AlwaysActiveObserver 没有实现 LifecycleEventObserver 方法接口，所以在 Activity o生命周期变化的时候，不会回调 onStateChange 方法。从而也不会主动 remove 掉 observer。因为我们的 obsever 被 remove 掉是依赖于 Activity 生命周期变化的时候，回调 LifecycleEventObserver 的 onStateChange 方法。
+
+### 总结
+- liveData 当我们 addObserver 的时候，会用 LifecycleBoundObserver 包装 observer，而 LifecycleBoundObserver 可以感应生命周期，当 activity 生命周期变化的时候，如果不是处于激活状态，判断是否需要 remove 生命周期，需要 remove，不需要，直接返回
+
+- 当处于激活状态的时候，会判断是不是 mVersion最新版本，不是的话需要将上一次缓存的数据通知相应的 observer，并将 mLastVsersion 置为最新
+
+- 当我们调用 setValue 的时候，mVersion +1，如果处于激活状态，直接处理，如果不是处理激活状态，返回，等到下次处于激活状态的时候，在进行相应的处理
+
+- 如果你想 livedata setValue 之后立即回调数据，而不是等到生命周期变化的时候才回调数据，你可以使用 observeForever 方法，但是你必须在 onDestroy 的时候 removeObserver。因为 AlwaysActiveObserver 没有实现 LifecycleEventObserver 接口，不能感应生命周期。
