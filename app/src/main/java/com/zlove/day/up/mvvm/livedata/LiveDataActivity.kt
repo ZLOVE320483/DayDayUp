@@ -1,6 +1,7 @@
 package com.zlove.day.up.mvvm.livedata
 
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
@@ -23,7 +24,11 @@ class LiveDataActivity : AppCompatActivity() {
         })
 
         post_value.setOnClickListener {
-            userViewModel.mUserLiveData.value = User("zlove", 30)
+            userViewModel.mUserLiveData.postValue(User("zlove", 30))
         }
+
+        NetworkLiveData.getInstance(this).observe(this, Observer {
+            Log.d("NetworkLiveData", " NetworkInfo --- $it")
+        })
     }
 }
