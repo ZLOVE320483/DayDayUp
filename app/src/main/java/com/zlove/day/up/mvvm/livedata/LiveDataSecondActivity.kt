@@ -1,6 +1,5 @@
 package com.zlove.day.up.mvvm.livedata
 
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
@@ -13,7 +12,7 @@ import kotlinx.android.synthetic.main.activity_livedata.*
  * Author by zlove, Email zlove.zhang@bytedance.com, Date on 2020/12/3.
  * PS: Not easy to write code, please indicate.
  */
-class LiveDataActivity : AppCompatActivity() {
+class LiveDataSecondActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,15 +21,10 @@ class LiveDataActivity : AppCompatActivity() {
         val userViewModel = ViewModelProvider(this).get(UserViewModel::class.java)
         userViewModel.mUserLiveData.observe(this, Observer<User> { user ->
             user_info.text = user?.toString()
-            Log.d("LiveDataActivity", "user--- $user")
         })
 
         post_value.setOnClickListener {
-            userViewModel.mUserLiveData.postValue(User("zlove", 30))
-        }
-
-        jump.setOnClickListener {
-            startActivity(Intent(this@LiveDataActivity, LiveDataSecondActivity::class.java))
+            userViewModel.mUserLiveData.postValue(User("zlove22", 31))
         }
     }
 }
