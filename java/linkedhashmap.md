@@ -44,9 +44,9 @@ static class Entry<K,V> extends HashMap.Node<K,V> {
 
 final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
               boolean evict) {
-              
+
    Node<K,V>[] tab; Node<K,V> p; int n, i;
-   
+
    if ((tab = table) == null || (n = tab.length) == 0)
        n = (tab = resize()).length;
    if ((p = tab[i = (n - 1) & hash]) == null)
@@ -71,7 +71,7 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                if (e.hash == hash &&
                    ((k = e.key) == key || (key != null && key.equals(k))))
                    break;
-               //移动指针    
+               //移动指针
                p = e;
            }
        }
