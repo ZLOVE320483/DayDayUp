@@ -243,3 +243,271 @@ void afterNodeRemoval(Node<K,V> e) {
 ![LinkedHashMap节点删除](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/linkedhashmap4.png)
 
 #### LinkedHashMap 维护节点访问顺序
+
+上边我们分析了 ```LinkedHashMap``` 与 ```HashMap``` 添加和删除元素的不同，可以看出除了维护 Hash表中元素的关系以外，LinkedHashMap 还在添加和删除元素的时候维护着一个双向链表。大家肯定也猜到了 ```LinkedHashMap``` 维护这个双向链表的作用，接下来再通过一个例子验证一下：
+```
+        Map<String, String> hashMap = new HashMap<>();
+        hashMap.put("老大", "1");
+        hashMap.put("老二", "2");
+        hashMap.put("老三", "3");
+        hashMap.put("老四", "4");
+
+        Set<Map.Entry<String, String>> entrySet = hashMap.entrySet();
+        Iterator iterator = entrySet.iterator();
+        while (iterator.hasNext()) {
+            Map.Entry entry = (Map.Entry) iterator.next();
+            System.out.println("key: " + entry.getKey() + ", value: " + entry.getValue());
+        }
+```
+
+这是一个普通的 ``` HashMap ```，来看一下它的打印结果：
+
+```
+key: 老二, value: 2
+key: 老四, value: 4
+key: 老三, value: 3
+key: 老大, value: 1
+```
+
+```
+        Map<String, String> linkedHashMap = new LinkedHashMap<>();
+        linkedHashMap.put("老大", "1");
+        linkedHashMap.put("老二", "2");
+        linkedHashMap.put("老三", "3");
+        linkedHashMap.put("老四", "4");
+
+        Set<Map.Entry<String, String>> linkedEntrySet = linkedHashMap.entrySet();
+        Iterator linkedIterator = linkedEntrySet.iterator();
+        while (linkedIterator.hasNext()) {
+            Map.Entry entry = (Map.Entry) linkedIterator.next();
+            System.out.println("key: " + entry.getKey() + ", value: " + entry.getValue());
+        }
+```
+
+这是一个普通的 ``` HashMap ```，来看一下它的打印结果：
+
+```
+key: 老大, value: 1
+key: 老二, value: 2
+key: 老三, value: 3
+key: 老四, value: 4
+```
+
+由上述方法结果可以看出：
+
+- ```HashMap``` 的遍历结果是跟添加顺序并无关系
+
+- ```LinkedHashMap``` 的遍历结果就是添加顺序
+
+这就是双向链表的作用。双向链表能做的不仅仅是这些，在介绍双向链表维护访问顺序前我们看来看一个重要的参数：
+
+```
+final boolean accessOrder;// 是否维护双向链表中的元素访问顺序
+```
+
+该方法随 LinkedHashMap 构造参数初始化，accessOrder 默认值为 false，我们可以通过三个参数构造方法指定该参数的值，参数定义为 final 说明外部不能改变。
+
+```
+public LinkedHashMap(int initialCapacity, float loadFactor) {
+   super(initialCapacity, loadFactor);
+   accessOrder = false;
+}
+ 
+public LinkedHashMap(int initialCapacity) {
+        super(initialCapacity);
+        accessOrder = false;
+}
+
+public LinkedHashMap() {
+        super();
+        accessOrder = false;
+}
+
+public LinkedHashMap(Map<? extends K, ? extends V> m) {
+   super();
+   accessOrder = false;
+   putMapEntries(m, false);
+}
+
+//可以指定 LinkedHashMap 双向链表维护节点访问顺序的构造参数
+public LinkedHashMap(int initialCapacity,
+                         float loadFactor,
+                         boolean accessOrder) {
+        super(initialCapacity, loadFactor);
+        this.accessOrder = accessOrder;
+}
+```
+
+我们试着使用三个参数的构造方法来创建上述例子中的 Map：
+
+```
+        Map<String, String> linkedHashMap = new LinkedHashMap<String, String>(16, 0.75f, true);
+        linkedHashMap.put("老大", "1");
+        linkedHashMap.put("老二", "2");
+        linkedHashMap.put("老三", "3");
+        linkedHashMap.put("老四", "4");
+
+        System.out.println("老三的值为：" + linkedHashMap.get("老三"));
+        System.out.println("老大的值为：" + linkedHashMap.get("老大"));
+
+        Set<Map.Entry<String, String>> linkedEntrySet = linkedHashMap.entrySet();
+        Iterator linkedIterator = linkedEntrySet.iterator();
+        while (linkedIterator.hasNext()) {
+            Map.Entry entry = (Map.Entry) linkedIterator.next();
+            System.out.println("key: " + entry.getKey() + ", value: " + entry.getValue());
+        }
+```
+
+接着看一下输出结果：
+
+```
+老三的值为：3
+老大的值为：1
+key: 老二, value: 2
+key: 老四, value: 4
+key: 老三, value: 3
+key: 老大, value: 1
+```
+
+可以看出当我们使用 access 为 true 后，我们访问元素的顺序将会在下次遍历的时候体现，最后访问的元素将最后获得。其实这一切在 HashMap 源码中也早有伏笔, 还记得我们在每次 ```putVal/get/repalce``` 最后都有一个 ```void afterNodeAccess(Node<K,V> e)``` 方法，该方法在 ```HashMap``` 中是空实现，但是在 ```LinkedHasMap``` 中该后置方法，将作为维护节点访问顺序的重要方法，我们来看下其实现：
+```
+//将被访问节点移动到链表最后
+void afterNodeAccess(Node<K,V> e) { // move node to last
+   LinkedHashMap.Entry<K,V> last;
+   if (accessOrder && (last = tail) != e) {
+       LinkedHashMap.Entry<K,V> p =
+           (LinkedHashMap.Entry<K,V>)e, b = p.before, a = p.after;
+       //访问节点的后驱置为 null    
+       p.after = null;
+       //如访问节点的前驱为 null 则说明 p = head
+       if (b == null)
+           head = a;
+       else
+           b.after = a;
+       //如果 p 不为尾节点 那么将 a 的前驱设置为 b    
+       if (a != null)
+           a.before = b;
+       else
+           last = b;
+           
+       if (last == null)
+           head = p;
+       else {
+           p.before = last;
+           last.after = p;
+       }
+       tail = p;// 将 p 接在双向链表的最后
+       ++modCount;
+   }
+}
+```
+
+我们以下图举例看下整个 ```afterNodeAccess``` 过程是是怎么样的，比如我们该次操作访问的是 13 这个节点，而 14 是其后驱，11 是其前驱，且 tail = 14 。在通过 get 访问 13 节点后， 13变成了 tail 节点，而14变成了其前驱节点，相应的 14的前驱变成 11 ，11的后驱变成了14， 14的后驱变成了13。
+
+![afterNodeAccess过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/linkedhashmap5.png)
+
+由此我们得知，```LinkedHashMap``` 通过 ```afterNodeAccess``` 这个后置操作，可以在 ```accessOrde = true``` 的时候，使双向链表维护哈希表中元素的访问顺序。
+
+#### Java 中最简单的 LRU 构建方式
+LRU 是 Least Recently Used 的简称，即近期最少使用，相信做 Android 的同学一定知道 LruCache 这个东西, Glide 的三级缓存中内存缓存中也使用了这个 LruCache 类。
+
+LRU 算法实现的关键就像它名字一样，当达到预定阈值的时候，这个阈值可能是内存不足，或者容量达到最大，找到最近最少使用的存储元素进行移除，保证新添加的元素能够保存到集合中。
+
+下面我们来讲解下，Java 中 LRU 算法的最简单的实现。我们还记得在每次调用 HashMap 的 putVal 方法添加完元素后还有个后置操作，void afterNodeInsertion(boolean evict) { } 就是这个方法。 LinkedHashMap 重写了此方法：
+
+```
+// HashMap 中 putVal 方法实现 evict 传递的 true，表示表处于创建模式。
+public V put(K key, V value) {
+   return putVal(hash(key), key, value, false, true);
+}
+
+final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+                   boolean evict) { .... }
+
+
+//evict 由上述说明大部分情况下都传 true 表示表处于创建模式
+void afterNodeInsertion(boolean evict) { // possibly remove eldest
+   LinkedHashMap.Entry<K,V> first;
+   //由于 evict = true 那么当链表不为空的时候 且 removeEldestEntry(first) 返回 true 的时候进入if 内部
+   if (evict && (first = head) != null && removeEldestEntry(first)) {
+       K key = first.key;
+       removeNode(hash(key), key, null, false, true);//移除双向链表中处于 head 的节点
+   }
+}
+
+ //LinkedHashMap 默认返回 false 则不删除节点。 返回 true 双向链表中处于 head 的节点
+protected boolean removeEldestEntry(Map.Entry<K,V> eldest) {
+   return false;
+}
+```
+
+由上述源码可以看出，如果如果 removeEldestEntry(Map.Entry<K,V> eldest) 方法返回值为 true 的时候，当我们添加一个新的元素之后，afterNodeInsertion这个后置操作，将会删除双向链表最初的节点，也就是 head 节点。那么我们就可以从 removeEldestEntry 方法入手来构建我们的 LruCache 。
+
+```
+public class LruCache<K, V> extends LinkedHashMap<K, V> {
+
+   private static final int MAX_NODE_NUM = 2<<4;
+
+   private int limit;
+
+   public LruCache() {
+       this(MAX_NODE_NUM);
+   }
+
+   public LruCache(int limit) {
+       super(limit, 0.75f, true);
+       this.limit = limit;
+   }
+
+   public V putValue(K key, V val) {
+       return put(key, val);
+   }
+
+   public V getValue(K key) {
+       return get(key);
+   }
+   
+   /**
+    * 判断存储元素个数是否预定阈值
+    * @return 超限返回 true，否则返回 false
+    */
+   @Override
+   protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+       return size() > limit;
+   }
+}
+```
+我们构建了一个 ```LruCache``` 类， 他继承自 ```LinkedHashMap``` 在构建的时候，调用了 ```LinkedHashMap``` 的三个参数的构造方法且 accessOrder 传入 true，并覆写了 removeEldestEntry 方法，当 Map 中的节点个数超过我们预定的阈值时候在 putValue 将会执行 afterNodeInsertion 删除最近没有访问的元素。 下面我们来测试一下：
+
+```
+    //构建一个阈值为 3 的 LruCache 类
+    LruCache<String,Integer> lruCache = new LruCache<>(3);
+    
+    
+    lruCache.putValue("老大", 1);
+    lruCache.putValue("老二", 2);
+    lruCache.putValue("老三", 3);
+    
+    lruCache.getValue("老大");
+    
+    //超过指定 阈值 3 再次添加元素的 将会删除最近最少访问的节点
+    lruCache.putValue("老四", 4);
+    
+    System.out.println("lruCache = " + lruCache);
+```
+
+运行结果当然是删除 key 为 "老二" 的节点：
+
+```
+lruCache = {老三=3, 老大=1, 老四=4}
+```
+
+#### 总结
+
+1. ```LinkedHashMap``` 拥有与 ```HashMap``` 相同的底层哈希表结构，即数组 + 单链表 + 红黑树，也拥有相同的扩容机制。
+
+2. ```LinkedHashMap``` 相比 ```HashMap``` 的拉链式存储结构，内部额外通过 ```Entry``` 维护了一个双向链表。
+
+3. ```HashMap``` 元素的遍历顺序不一定与元素的插入顺序相同，而 ```LinkedHashMap``` 则通过遍历双向链表来获取元素，所以遍历顺序在一定条件下等于插入顺序。
+
+4. ```LinkedHashMap``` 可以通过构造参数 ```accessOrder``` 来指定双向链表是否在元素被访问后改变其在双向链表中的位置。
