@@ -1,5 +1,6 @@
  ## Java
 1. [HashMap扩容](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/hashmap.md)
+2. [LinkedHashMap源码解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/hashmap.md)
 
 ## Android
 1. [Retrofit源码解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/retrofit.md)

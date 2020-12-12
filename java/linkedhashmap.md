@@ -145,3 +145,101 @@ private void linkNodeLast(LinkedHashMap.Entry<K,V> p) {
    }
 }
 ```
+
+![LinkedHashMap链表创建](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/linkedhashmap3.png)
+
+```LinkedHashMap``` 链表创建步骤，可用上图几个步骤来描述，蓝色部分是 ```HashMap``` 的方法，而橙色部分为 ```LinkedHashMap``` 独有的方法。
+
+当我们创建一个新节点之后，通过linkNodeLast方法，将新的节点与之前双向链表的最后一个节点（tail）建立关系，在这部操作中我们仍不知道这个节点究竟储存在哈希表表的何处，但是无论他被放到什么地方，节点之间的关系都会加入双向链表。如上述图中节点 3 和节点 4 那样彼此拥有指向对方的引用，这么做就能确保了双向链表的元素之间的关系即为添加元素的顺序。
+
+#### LinkedHashMap 删除节点的操作
+
+如插入操作一样，```LinkedHashMap``` 没有重写的 remove 方法，使用的仍然是 ```HashMap``` 中的代码，我们先来回忆一下 ```HashMap``` 中的 remove 方法：
+
+```
+ public V remove(Object key) {
+   Node<K,V> e;
+   return (e = removeNode(hash(key), key, null, false, true)) == null ?
+       null : e.value;
+}
+
+// HashMap 中实现
+ final Node<K,V> removeNode(int hash, Object key, Object value,
+                               boolean matchValue, boolean movable) {
+   Node<K,V>[] tab; Node<K,V> p; int n, index;
+   //判断哈希表是否为空，长度是否大于0 对应的位置上是否有元素
+   if ((tab = table) != null && (n = tab.length) > 0 &&
+       (p = tab[index = (n - 1) & hash]) != null) {
+       
+       // node 用来存放要移除的节点， e 表示下个节点 k ，v 每个节点的键值
+       Node<K,V> node = null, e; K k; V v;
+       //如果第一个节点就是我们要找的直接赋值给 node
+       if (p.hash == hash &&
+           ((k = p.key) == key || (key != null && key.equals(k))))
+           node = p;
+       else if ((e = p.next) != null) {
+            // 遍历红黑树找到对应的节点
+           if (p instanceof TreeNode)
+               node = ((TreeNode<K,V>)p).getTreeNode(hash, key);
+           else {
+                //遍历对应的链表找到对应的节点
+               do {
+                   if (e.hash == hash &&
+                       ((k = e.key) == key ||
+                        (key != null && key.equals(k)))) {
+                       node = e;
+                       break;
+                   }
+                   p = e;
+               } while ((e = e.next) != null);
+           }
+       }
+       // 如果找到了节点
+       // !matchValue 是否不删除节点
+       // (v = node.value) == value ||
+                            (value != null && value.equals(v))) 节点值是否相同，
+       if (node != null && (!matchValue || (v = node.value) == value ||
+                            (value != null && value.equals(v)))) {
+           //删除节点                 
+           if (node instanceof TreeNode)
+               ((TreeNode<K,V>)node).removeTreeNode(this, tab, movable);
+           else if (node == p)
+               tab[index] = node.next;
+           else
+               p.next = node.next;
+           ++modCount;
+           --size;
+           afterNodeRemoval(node);// 注意这个方法 在 Hash表的删除操作完成调用该方法
+           return node;
+       }
+   }
+   return null;
+}
+```
+
+对于 afterNodeRemoval(node) ```HashMap``` 中是空实现，而该方法，正是 ```LinkedHashMap``` 删除对应节点在双向链表中的关系的操作：
+```
+//  从双向链表中删除对应的节点 e 为已经删除的节点
+void afterNodeRemoval(Node<K,V> e) { 
+    LinkedHashMap.Entry<K,V> p =
+        (LinkedHashMap.Entry<K,V>)e, b = p.before, a = p.after;
+    // 将 p 节点的前后指针引用置为 null 便于内存释放
+    p.before = p.after = null;
+    // p.before 为 null，表明 p 是头节点 
+    if (b == null)
+        head = a;
+    else//否则将 p 的前驱节点连接到 p 的后驱节点
+        b.after = a;
+    // a 为 null，表明 p 是尾节点
+    if (a == null)
+        tail = b;
+    else //否则将 a 的前驱节点连接到 b 
+        a.before = b;
+}
+```
+
+因此 ```LinkedHashMap``` 节点删除方式如下图步骤一样：
+
+![LinkedHashMap节点删除](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/linkedhashmap4.png)
+
+#### LinkedHashMap 维护节点访问顺序
