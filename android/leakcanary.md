@@ -105,3 +105,15 @@ public class RefWatcherBuilder<T extends RefWatcherBuilder<T>> {
 
 接着来分析下install()方法中的链式调用的listenerServiceClass(DisplayLeakService.class)这部分逻辑。
 
+4. AndroidRefWatcherBuilder#listenerServiceClass()
+```
+  public @NonNull AndroidRefWatcherBuilder listenerServiceClass(
+      @NonNull Class<? extends AbstractAnalysisResultService> listenerServiceClass) {
+    enableDisplayLeakActivity = DisplayLeakService.class.isAssignableFrom(listenerServiceClass);
+    return heapDumpListener(new ServiceHeapDumpListener(context, listenerServiceClass));
+  }
+```
+在这里，传入了一个DisplayLeakService的Class对象，它的作用是展示泄露分析的结果日志，然后会展示一个用于跳转到显示泄露界面DisplayLeakActivity的通知。在listenerServiceClass()这个方法中新建了一个ServiceHeapDumpListener对象，看看它内部的操作。
+
+5. ServiceHeapDumpListener
+
