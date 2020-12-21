@@ -26,7 +26,9 @@ class DayUpApplication : Application() {
         super.onCreate()
         val dirPath = MMKV.initialize(this)
         Log.d("MMKV", "path --- $dirPath")
-        mRefWatcher = LeakCanary.install(this)
+        if (!LeakCanary.isInAnalyzerProcess(this)) {
+            mRefWatcher = LeakCanary.install(this)
+        }
     }
 
 
