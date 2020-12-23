@@ -4,7 +4,7 @@
 3. [HashSet源码解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/hashset.md)
 
 ## Kotlin
-1. [Kotlin内联函数](https://github.com/ZLOVE320483/DayDayUp/blob/main/kotlin/kotlin_inlne.md)
+1. [Kotlin内联函数](https://github.com/ZLOVE320483/DayDayUp/blob/main/kotlin/kotlin_inline.md)
 
 ## Android
 1. [Retrofit源码解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/retrofit.md)
