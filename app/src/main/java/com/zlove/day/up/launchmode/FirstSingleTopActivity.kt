@@ -4,7 +4,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import com.zlove.day.up.FirstFragment
 import com.zlove.day.up.R
+import com.zlove.day.up.util.newFragment
+import com.zlove.day.up.util.startActivity
 import kotlinx.android.synthetic.main.activity_launch_mode.*
 
 /**
@@ -18,8 +21,10 @@ class FirstSingleTopActivity : AppCompatActivity() {
         setContentView(R.layout.activity_launch_mode)
 
         jump.setOnClickListener {
-            startActivity(Intent(this@FirstSingleTopActivity, SecondSingleTopActivity::class.java))
+            startActivity<SecondSingleTopActivity>()
         }
+
+        val fragment = newFragment<FirstFragment>(Pair("aaa", "bbb"))
 
         Log.d("LaunchMode", "FirstSingleTopActivity --- onCreate ---")
         Log.d("LaunchMode", "FirstSingleTopActivity --- hashcode --- ${hashCode()}")
