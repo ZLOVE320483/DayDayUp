@@ -4,6 +4,7 @@
 3. [HashSet源码解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/hashset.md)
 4. [Jvm函数内联](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/jvm_line.md)
 5. [Java泛型擦除](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/generic_erasure.md)
+6. [Java类初始化过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/java_class_init_order.md)
 
 ## Kotlin
 1. [Kotlin内联函数](https://github.com/ZLOVE320483/DayDayUp/blob/main/kotlin/kotlin_inline.md)
