@@ -6,3 +6,6 @@
 
 4. [死锁原理](https://blog.csdn.net/weixin_39651041/article/details/79993975)
 
+5. [抢占式进程调度和进程优先级](https://www.cnblogs.com/hjh-666/p/11449470.html)
+
+6. [原子操作原理](https://www.cnblogs.com/Tu9oh0st/p/10147158.html)
