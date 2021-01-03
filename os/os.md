@@ -3,3 +3,6 @@
 2. [一篇让你明白进程与线程之间的区别与联系](https://juejin.cn/post/6844903801321685000)
 
 3. [谈谈你对多线程同步机制的理解](https://blog.csdn.net/github_37130188/article/details/102710583)
+
+4. [死锁原理](https://blog.csdn.net/weixin_39651041/article/details/79993975)
+
