@@ -9,3 +9,7 @@
 5. [抢占式进程调度和进程优先级](https://www.cnblogs.com/hjh-666/p/11449470.html)
 
 6. [原子操作原理](https://www.cnblogs.com/Tu9oh0st/p/10147158.html)
+
+7. [读写锁](https://juejin.cn/post/6844903988169555975)
+
+8. [线程池设计](https://tech.meituan.com/2020/04/02/java-pooling-pratice-in-meituan.html)
