@@ -3,6 +3,7 @@ package com.zlove.day.up
 import android.app.Application
 import android.content.Context
 import android.util.Log
+import com.facebook.drawee.backends.pipeline.Fresco
 import com.squareup.leakcanary.LeakCanary
 import com.squareup.leakcanary.RefWatcher
 import com.tencent.mmkv.MMKV
@@ -29,6 +30,7 @@ class DayUpApplication : Application() {
         if (!LeakCanary.isInAnalyzerProcess(this)) {
             mRefWatcher = LeakCanary.install(this)
         }
+        Fresco.initialize(this)
     }
 
 

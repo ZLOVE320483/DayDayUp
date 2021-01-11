@@ -15,6 +15,10 @@
 2. [ViewModel为什么能保存重建数据](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/viewmodel.md)
 3. [LiveData 使用 & 解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/livedata.md)
 4. [LeakCanary原理解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/leakcanary.md)
+5. [Fresco源码鉴赏](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/fresco.md)
 
 ## Network
 1. [浏览器输入URL后执行过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/network/url_visit.md)
+
+## Os
+1. [OS基础知识](https://github.com/ZLOVE320483/DayDayUp/blob/main/os/os.md)
