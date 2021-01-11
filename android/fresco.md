@@ -11,4 +11,4 @@ Fresco是一个功能趋于完善的图片加载框架，在Android开发中有�
 
 由于Fresco比较大，我们先来看一下它的整体结构，有个整体的把握，Fresco的整体架构如下图所示：
 
-![Fresco整体架构](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/fresco1.png)
+![Fresco整体架构](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/fresco1.jpeg)

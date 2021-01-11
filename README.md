@@ -20,5 +20,5 @@
 ## Network
 1. [浏览器输入URL后执行过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/network/url_visit.md)
 
-## Os
+## OS
 1. [OS基础知识](https://github.com/ZLOVE320483/DayDayUp/blob/main/os/os.md)
