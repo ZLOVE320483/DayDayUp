@@ -46,3 +46,29 @@ Fresco是一个功能趋于完善的图片加载框架，在Android开发中有�
 - Consumer：用来接收Producer产生的结果，它与Producer组成了生产者与消费者模式。
 
 > 注：Fresco源码里的类的名字都比较长，但是都是按照一定的命令规律来的，例如：以Supplier结尾的类都实现了Supplier接口，它可以提供某一个类型的对象（factory, generator, builder, closure等）。以Builder结尾的当然就是以构造者模式创建对象的类。
+
+通过上面的描述，我们对Fresco有了一个整体认知，面对这样一个庞大的库，我们在分析的时候需要关注以下几个重点：
+
+1. 图片加载流程
+2. DraweeController与DraweeHierarchy
+3. Producer与Consumer
+4. 缓存机制
+
+下面就让我们一起进入到源码中。
+### 图片加载流程
+
+举例
+
+> 初始化
+```
+Fresco.initialize(this);
+```
+> 加载图片
+```
+String url = "https://github.com/guoxiaoxing/android-open-framwork-analysis/raw/master/art/fresco/scenery.jpg";
+SimpleDraweeView simpleDraweeView = findViewById(R.id.drawee_view);
+simpleDraweeView.setImageURI(Uri.parse(url));
+```
+我们来看一下它的调用流程，序列图如下所示：
+
+![Fresco调用流程图](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/fresco2.png)
