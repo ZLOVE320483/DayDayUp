@@ -72,3 +72,132 @@ simpleDraweeView.setImageURI(Uri.parse(url));
 我们来看一下它的调用流程，序列图如下所示：
 
 ![Fresco调用流程图](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/fresco2.png)
+
+嗯，图看起来有点大，但是不要紧，我们按照颜色将整个流程分为了四大步：
+
+1. 初始化Fresco。
+2. 获取DataSource。
+3. 绑定Controller与Hierarchy。
+4. 从内存缓存/磁盘缓存/网络获取图片，并设置到对应的Drawable层。
+
+> 注：Fresco里的类虽多，类名虽长，但都是基于接口和Abstract类的设计，每个模块自成一套继承体系，所以只要掌握了它们的继承关系以及不同模块之间的联系，整个流程还是比较简单的。
+
+由于序列图涉及具体细节，为了辅助理解，我们再提供一张总结新的流程图，如下所示：
+
+![Fresco调用流程图](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/fresco3.png)
+
+接下来，我们就针对这两张图结合具体细节来一一分析。
+
+### 1.1 初始化Fresco
+
+```
+public class Fresco {
+    public static void initialize(
+        Context context,
+        @Nullable ImagePipelineConfig imagePipelineConfig,
+        @Nullable DraweeConfig draweeConfig) {
+      //... 重复初始化检验
+      try {
+        //1. 加载so库，这个主要是一些第三方的native库，例如：giflib，libjpeg，libpng，
+        //主要用来做图片解码。
+        SoLoader.init(context, 0);
+      } catch (IOException e) {
+        throw new RuntimeException("Could not initialize SoLoader", e);
+      }
+      //2. 设置传入的配置参数magePipelineConfig。
+      context = context.getApplicationContext();
+      if (imagePipelineConfig == null) {
+        ImagePipelineFactory.initialize(context);
+      } else {
+        ImagePipelineFactory.initialize(imagePipelineConfig);
+      }
+      //3. 初始化SimpleDraweeView。
+      initializeDrawee(context, draweeConfig);
+    }
+  
+    private static void initializeDrawee(
+        Context context,
+        @Nullable DraweeConfig draweeConfig) {
+      //构建PipelineDraweeControllerBuilderSupplier对象，并传给SimpleDraweeView。
+      sDraweeControllerBuilderSupplier =
+          new PipelineDraweeControllerBuilderSupplier(context, draweeConfig);
+      SimpleDraweeView.initialize(sDraweeControllerBuilderSupplier);
+    }  
+}
+```
+
+可以发现，Fresco在初始化的过程中，主要做了三件事情：
+1. 加载so库，这个主要是一些第三方的native库，例如：giflib，libjpeg，libpng，主要用来做图片解码。
+2. 设置传入的配置参数imagePipelineConfig。
+3. 初始化SimpleDraweeView。
+
+这里面我们需要重点关注俩个对象：
+
+- ImagePipelineConfig：ImagePipeline参数配置。
+- DraweeControllerBuilderSupplier：提供DraweeControllerBuilder用来构建DraweeController。
+
+我们先来看ImagePipelineConfig，ImagePipelineConfig通过建造者模式来构建传递给ImagePipeline的参数，如下所示：
+
+- Bitmap.Config mBitmapConfig; 图片质量。
+- Supplier mBitmapMemoryCacheParamsSupplier; 内存缓存的配置参数提供者。
+- CountingMemoryCache.CacheTrimStrategy mBitmapMemoryCacheTrimStrategy; 内存缓存的削减策略。
+- CacheKeyFactory mCacheKeyFactory; CacheKey的创建工厂。
+- Context mContext; 上下文环境。
+- boolean mDownsampleEnabled; 是否开启图片向下采样。
+- FileCacheFactory mFileCacheFactory; 磁盘缓存创建工厂。
+- Supplier mEncodedMemoryCacheParamsSupplier; 未解码图片缓存配置参数提供者。
+- ExecutorSupplier mExecutorSupplier; 线程池提供者
+- ImageCacheStatsTracker mImageCacheStatsTracker; 图片缓存状态追踪器。
+- ImageDecoder mImageDecoder; 图片解码器。
+- Supplier mIsPrefetchEnabledSupplier; 是否开启预加载。
+- DiskCacheConfig mMainDiskCacheConfig; 磁盘缓存配置。
+- MemoryTrimmableRegistry mMemoryTrimmableRegistry; 内存变化监听注册表，那些需要监听系统内存变化的对象需要添加到这个表中类。
+- NetworkFetcher mNetworkFetcher; 下载网络图片，默认使用内置的HttpUrlConnectionNetworkFetcher，也可以自定义。
+- PlatformBitmapFactory mPlatformBitmapFactory; 根据不同的Android版本生成不同的Bitmap的工厂，主要的区别在Bitmap在内存中的位置，Android 5.0以下存储在Ashmem中，Android 5.0以上存在Java Heap中。
+- PoolFactory mPoolFactory; Bitmap池等各种池的构建工厂。
+- ProgressiveJpegConfig mProgressiveJpegConfig; 渐进式JPEG配置。
+- Set mRequestListeners; 请求监听器集合，监听请求过程中的各种事件。
+- boolean mResizeAndRotateEnabledForNetwork; 是否开启网络图片的压缩和旋转。
+- DiskCacheConfig mSmallImageDiskCacheConfig; 磁盘缓存配置
+- ImageDecoderConfig mImageDecoderConfig; 图片解码配置
+- ImagePipelineExperiments mImagePipelineExperiments; Fresco提供的关于Image Pipe的实验性功能。
+
+上述参数基本不需要我们手动配置，除非项目上有定制性的需求。
+
+我们可以发现，在初始化方法的最后调用initializeDrawee()给SimpleDraweeView传入了一PipelineDraweeControllerBuilderSupplier，这是一个很重要的对象，我们来看看它都初始化了哪些东西。
+
+```
+public class PipelineDraweeControllerBuilderSupplier implements
+    Supplier<PipelineDraweeControllerBuilder> {
+    
+      public PipelineDraweeControllerBuilderSupplier(
+          Context context,
+          ImagePipelineFactory imagePipelineFactory,
+          Set<ControllerListener> boundControllerListeners,
+          @Nullable DraweeConfig draweeConfig) {
+        mContext = context;
+        //1. 获取ImagePipeline
+        mImagePipeline = imagePipelineFactory.getImagePipeline();
+    
+        if (draweeConfig != null && draweeConfig.getPipelineDraweeControllerFactory() != null) {
+          mPipelineDraweeControllerFactory = draweeConfig.getPipelineDraweeControllerFactory();
+        } else {
+          mPipelineDraweeControllerFactory = new PipelineDraweeControllerFactory();
+        }
+        //2. 获取PipelineDraweeControllerFactory，并初始化。
+        mPipelineDraweeControllerFactory.init(
+            context.getResources(),
+            DeferredReleaser.getInstance(),
+            imagePipelineFactory.getAnimatedDrawableFactory(context),
+            UiThreadImmediateExecutorService.getInstance(),
+            mImagePipeline.getBitmapMemoryCache(),
+            draweeConfig != null
+                ? draweeConfig.getCustomDrawableFactories()
+                : null,
+            draweeConfig != null
+                ? draweeConfig.getDebugOverlayEnabledSupplier()
+                : null);
+        mBoundControllerListeners = boundControllerListeners;
+      }
+}
+```
