@@ -1,2 +1,4 @@
 include ':app'
+include ':base'
+project(':base').projectDir = new File('./library/base')
 rootProject.name = "DayUp"
