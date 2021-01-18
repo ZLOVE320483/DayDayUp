@@ -30,6 +30,22 @@ android {
     kotlinOptions {
         jvmTarget = '1.8'
     }
+
+    flavorDimensions "size", "color"
+    productFlavors {
+        big {
+            dimension "size"
+        }
+        small {
+            dimension "size"
+        }
+        blue {
+            dimension "color"
+        }
+        red {
+            dimension "color"
+        }
+    }
 }
 
 dependencies {
@@ -41,6 +57,7 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation 'androidx.navigation:navigation-fragment-ktx:2.3.1'
     implementation 'androidx.navigation:navigation-ui-ktx:2.3.1'
+    implementation project(":base")
 
     implementation("com.google.android.material:material:1.2.1")
 

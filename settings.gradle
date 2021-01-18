@@ -1,3 +1,4 @@
+include ':gradle-plugin'
 include ':app'
 include ':base'
 project(':base').projectDir = new File('./library/base')
