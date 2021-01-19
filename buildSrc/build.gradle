@@ -1,0 +1,27 @@
+allprojects {
+    apply plugin: 'groovy'
+
+    repositories {
+        mavenCentral()
+        google()
+        jcenter()
+    }
+
+}
+
+sourceSets {
+    main {
+        groovy {
+            srcDir 'src/main/groovy'
+        }
+
+        resources {
+            srcDir 'src/main/resources'
+        }
+    }
+}
+
+dependencies {
+    implementation gradleApi()
+    implementation localGroovy()
+}

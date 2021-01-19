@@ -1,0 +1,13 @@
+package com.zlove.day.gradle.plugin
+
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+
+class MyPlugin implements Plugin<Project> {
+
+    @Override
+    void apply(Project project) {
+        println("apply my plugin")
+        project.tasks.create("mytask", MyTask.class)
+    }
+}
