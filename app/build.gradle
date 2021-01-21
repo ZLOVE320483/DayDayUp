@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
-apply plugin: 'myplugin'
+apply plugin: 'search'
 
 android {
     compileSdkVersion 29
@@ -30,22 +30,6 @@ android {
     }
     kotlinOptions {
         jvmTarget = '1.8'
-    }
-
-    flavorDimensions "size", "color"
-    productFlavors {
-        big {
-            dimension "size"
-        }
-        small {
-            dimension "size"
-        }
-        blue {
-            dimension "color"
-        }
-        red {
-            dimension "color"
-        }
     }
 }
 
