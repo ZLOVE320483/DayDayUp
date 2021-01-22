@@ -1,6 +1,7 @@
 package com.zlove.day.gradle.plugin
 
 import com.android.build.gradle.AppExtension
+import com.zlove.day.gradle.plugin.task.SearchAnnotationTask
 import org.apache.commons.io.FileUtils
 import org.gradle.api.Plugin
 import org.gradle.api.Project
