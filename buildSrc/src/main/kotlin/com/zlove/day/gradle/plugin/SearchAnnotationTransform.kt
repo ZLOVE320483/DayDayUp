@@ -34,10 +34,16 @@ class SearchAnnotationTransform(private val project: Project): Transform() {
         println("--- search transform start ---")
 
         val inputs = transformInvocation?.inputs
+
         inputs?.forEach { input ->
             val directoryInputs = input.directoryInputs
             directoryInputs?.forEach { directoryInput ->
-                SearchAnnotationJavassist.searchClassWithAnnotation(directoryInput.file.absolutePath, project)
+                SearchAnnotationJavassist.searchClassWithAnnotation(directoryInput.file)
+            }
+
+            val jarInPuts = input.jarInputs
+            jarInPuts?.forEach { jarInput ->
+                SearchAnnotationJavassist.searchJarWithAnnotation(jarInput.file)
             }
         }
         println("--- search transform end ---")

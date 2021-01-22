@@ -1,7 +1,6 @@
 package com.zlove.day.gradle.plugin
 
 import com.android.build.gradle.AppExtension
-import com.zlove.day.gradle.plugin.task.SearchAnnotationTask
 import org.apache.commons.io.FileUtils
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -20,8 +19,11 @@ class SearchAnnotationPlugin : Plugin<Project> {
         localProperties.load(FileUtils.openInputStream(File("${project.rootDir.path}/local.properties")))
 
         val gradleProperties = project.properties
-        val needOutputRouter = gradleProperties?.containsKey("outputRouter")?: false
-        if (localProperties["outputRouter"] == true || needOutputRouter) {
+        val needOutputRouter = gradleProperties.containsKey("outputRouter")
+
+        println("outputRouter -- ${localProperties["outputRouter"]}")
+
+        if (localProperties["outputRouter"] == "true" || needOutputRouter) {
             val android = project.extensions.getByType(AppExtension::class.java)
             android.registerTransform(SearchAnnotationTransform(project))
         }
