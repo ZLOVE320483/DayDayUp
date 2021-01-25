@@ -17,6 +17,7 @@
 4. [LeakCanary原理解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/leakcanary.md)
 5. [Fresco源码鉴赏](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/fresco.md)
 6. [LayoutInflate的inflate过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/inflatelayout.md)
+7. [EventBus源码解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/eventbus.md)
 
 ## Network
 1. [浏览器输入URL后执行过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/network/url_visit.md)
