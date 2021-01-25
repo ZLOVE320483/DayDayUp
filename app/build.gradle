@@ -38,6 +38,13 @@ android {
     lintOptions {
         abortOnError true
     }
+
+    applicationVariants.all { variant ->
+        def lintTask = tasks["lint${variant.name.capitalize()}"]
+        variant.getAssembleProvider().configure(){
+            it.dependsOn lintTask
+        }
+    }
 }
 
 dependencies {
