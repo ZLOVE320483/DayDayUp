@@ -35,6 +35,9 @@ android {
     kotlinOptions {
         jvmTarget = '1.8'
     }
+    lintOptions {
+        abortOnError true
+    }
 }
 
 dependencies {
@@ -46,6 +49,7 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation 'androidx.navigation:navigation-fragment-ktx:2.3.1'
     implementation 'androidx.navigation:navigation-ui-ktx:2.3.1'
+    lintChecks project(":lint")
     implementation project(":base")
 
     implementation("com.google.android.material:material:1.2.1")

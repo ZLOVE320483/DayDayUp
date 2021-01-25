@@ -24,8 +24,6 @@ class FirstSingleTopActivity : AppCompatActivity() {
             startActivity<SecondSingleTopActivity>()
         }
 
-        val fragment = newFragment<FirstFragment>(Pair("aaa", "bbb"))
-
         Log.d("LaunchMode", "FirstSingleTopActivity --- onCreate ---")
         Log.d("LaunchMode", "FirstSingleTopActivity --- hashcode --- ${hashCode()}")
     }
