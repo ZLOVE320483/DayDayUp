@@ -1,3 +1,5 @@
+include ':day-plugin'
+project(':day-plugin').projectDir = new File('./library/day-plugin')
 include ':lint'
 project(':lint').projectDir = new File('./library/lint')
 include ':app'

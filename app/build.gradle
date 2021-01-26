@@ -36,7 +36,7 @@ android {
         jvmTarget = '1.8'
     }
     lintOptions {
-        abortOnError true
+        abortOnError false
     }
 
     applicationVariants.all { variant ->
@@ -52,7 +52,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation 'androidx.core:core-ktx:1.3.2'
     implementation 'androidx.appcompat:appcompat:1.2.0'
-    implementation 'com.google.android.material:material:1.2.1'
+    implementation 'com.google.android.material:material:1.3.0-rc01'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation 'androidx.navigation:navigation-fragment-ktx:2.3.1'
     implementation 'androidx.navigation:navigation-ui-ktx:2.3.1'
@@ -73,8 +73,8 @@ dependencies {
     // --- mvvm ---
     implementation "androidx.lifecycle:lifecycle-common:2.2.0"
     implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
-    implementation "androidx.lifecycle:lifecycle-livedata-core:2.2.0"
-    implementation "androidx.lifecycle:lifecycle-viewmodel:2.2.0"
+    implementation "androidx.lifecycle:lifecycle-livedata-core-ktx:2.2.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.2.0"
 
     // --- mmkv ---
     implementation 'com.tencent:mmkv:1.0.22'
