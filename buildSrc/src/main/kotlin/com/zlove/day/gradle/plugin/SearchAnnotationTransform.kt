@@ -1,9 +1,9 @@
 package com.zlove.day.gradle.plugin
 
-import com.android.build.api.transform.QualifiedContent
-import com.android.build.api.transform.Transform
-import com.android.build.api.transform.TransformInvocation
+import com.android.build.api.transform.*
 import com.android.build.gradle.internal.pipeline.TransformManager
+import org.apache.commons.codec.digest.DigestUtils
+import org.apache.commons.io.FileUtils
 import org.gradle.api.Project
 
 /**
@@ -28,22 +28,29 @@ class SearchAnnotationTransform(private val project: Project): Transform() {
         return TransformManager.SCOPE_FULL_PROJECT
     }
 
-    override fun transform(transformInvocation: TransformInvocation?) {
-        super.transform(transformInvocation)
-
+    override fun transform(
+        context: Context?,
+        inputs: MutableCollection<TransformInput>?,
+        referencedInputs: MutableCollection<TransformInput>?,
+        outputProvider: TransformOutputProvider?,
+        isIncremental: Boolean
+    ) {
         println("--- search transform start ---")
-
-        val inputs = transformInvocation?.inputs
-
         inputs?.forEach { input ->
             val directoryInputs = input.directoryInputs
             directoryInputs?.forEach { directoryInput ->
                 SearchAnnotationJavassist.searchClassWithAnnotation(directoryInput.file)
+                val dest = outputProvider?.getContentLocation(directoryInput.name,
+                    directoryInput.contentTypes, directoryInput.scopes, Format.DIRECTORY)
+                FileUtils.copyDirectory(directoryInput.file, dest)
             }
 
             val jarInPuts = input.jarInputs
             jarInPuts?.forEach { jarInput ->
                 SearchAnnotationJavassist.searchJarWithAnnotation(jarInput.file)
+                val md5Name = DigestUtils.md5Hex(jarInput.file.absolutePath)
+                val dest = outputProvider?.getContentLocation(jarInput.name + md5Name, jarInput.contentTypes, jarInput.scopes, Format.JAR)
+                FileUtils.copyFile(jarInput.file, dest)
             }
         }
         println("--- search transform end ---")

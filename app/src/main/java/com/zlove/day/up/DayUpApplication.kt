@@ -2,11 +2,11 @@ package com.zlove.day.up
 
 import android.app.Application
 import android.content.Context
-import android.util.Log
-import com.facebook.drawee.backends.pipeline.Fresco
-import com.squareup.leakcanary.LeakCanary
-import com.squareup.leakcanary.RefWatcher
-import com.tencent.mmkv.MMKV
+import android.content.res.Resources
+import com.zlove.day.up.plugin.HookStartActivityUtils
+import com.zlove.day.up.plugin.PluginManager
+import com.zlove.day.up.util.FileUtils
+import java.io.File
 
 /**
  * Author by zlove, Email zlove.zhang@bytedance.com, Date on 2020/12/2.
@@ -14,24 +14,26 @@ import com.tencent.mmkv.MMKV
  */
 class DayUpApplication : Application() {
 
-    private var mRefWatcher: RefWatcher? = null
+    private var mPluginResource: Resources? = null
 
-    companion object {
-        fun getRefWatcher(context: Context): RefWatcher? {
-            val application = context.applicationContext as DayUpApplication
-            return application.mRefWatcher
+    override fun attachBaseContext(base: Context?) {
+        super.attachBaseContext(base)
+        FileUtils.copyAssetsData2File(filesDir, assets, "day-plugin-debug.apk")
+        val file = File(filesDir.absolutePath)
+        var pluginPath = ""
+        file.listFiles()?.forEach {
+            if (it.name.endsWith(".apk")) {
+                pluginPath = it.absolutePath
+            }
         }
+        println("pluginPath --- $pluginPath")
+        PluginManager.getInstance().init(this, pluginPath)
+        HookStartActivityUtils.hookStartActivity(this)
+        PluginManager.getInstance().insertDex(this.classLoader)
+        mPluginResource = PluginManager.getInstance().initPluginResource()
     }
 
-    override fun onCreate() {
-        super.onCreate()
-        val dirPath = MMKV.initialize(this)
-        Log.d("MMKV", "path --- $dirPath")
-        if (!LeakCanary.isInAnalyzerProcess(this)) {
-            mRefWatcher = LeakCanary.install(this)
-        }
-        Fresco.initialize(this)
+    override fun getResources(): Resources {
+        return if (mPluginResource == null) super.getResources() else mPluginResource!!
     }
-
-
 }

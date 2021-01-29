@@ -1,13 +1,13 @@
 package com.zlove.day.plugin
 
+import android.app.Activity
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
 
 /**
  * Author by zlove, Email zlove.zhang@bytedance.com, Date on 2021/1/26.
  * PS: Not easy to write code, please indicate.
  */
-class DayPluginActivity: AppCompatActivity() {
+class DayPluginActivity: Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

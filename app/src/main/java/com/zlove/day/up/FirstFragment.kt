@@ -28,11 +28,4 @@ class FirstFragment : Fragment() {
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
     }
-
-    override fun onDestroy() {
-        activity?.run {
-            DayUpApplication.getRefWatcher(this)?.watch(this)
-        }
-        super.onDestroy()
-    }
 }
