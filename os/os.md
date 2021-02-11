@@ -13,3 +13,5 @@
 7. [读写锁](https://juejin.cn/post/6844903988169555975)
 
 8. [线程池设计](https://tech.meituan.com/2020/04/02/java-pooling-pratice-in-meituan.html)
+
+9. [虚拟内存&常驻内存&共享内存](https://www.orchome.com/298)
