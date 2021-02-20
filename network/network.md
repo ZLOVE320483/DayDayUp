@@ -3,3 +3,4 @@
 3. [DNS原理及解析过程](https://zhuanlan.zhihu.com/p/88260838)
 4. [DNS劫持](https://zhuanlan.zhihu.com/p/86538629)
 5. [IPV6](https://zhuanlan.zhihu.com/p/36542469)
+6. [七层网络协议](https://www.cnblogs.com/aspirant/p/10813139.html)
