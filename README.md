@@ -6,6 +6,7 @@
 5. [Java泛型擦除](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/generic_erasure.md)
 6. [Java类初始化过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/java_class_init_order.md)
 7. [Java并发编程三大特性](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/concurrency_features.md)
+8. [Java"锁"事](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/lock.md)
 
 ## Kotlin
 1. [Kotlin内联函数](https://github.com/ZLOVE320483/DayDayUp/blob/main/kotlin/kotlin_inline.md)
