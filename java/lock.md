@@ -108,4 +108,91 @@ class Count implements Runnable {
     }
 }
 ```
+#### 等待(wait) 和 通知(notify)
 
+Object有两个很重要的接口:Object.wait()和Object.notify()
+
+当在一个对象实例上调用了wait()方法后,当前线程就会在这个对象上等待。直到其他线程调用了这个对象的notify()方法或者notifyAll()方法。notifyAll()方法与notify()方法的区别是它会唤醒所有正在等待这个对象的线程,而notify()方法只会随机唤醒一个等待该对象的线程。
+
+wait()、notify()和notifyAll()都需要在synchronized语句中使用:
+
+```
+public class LockThread extends Thread {
+
+    private Object mLock;
+
+    public LockThread(Object lock) {
+        this.mLock = lock;
+    }
+
+    @Override
+    public void run() {
+        super.run();
+
+        synchronized (mLock) {
+            try {
+                mLock.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            System.out.println("--- LockThread ---");
+        }
+    }
+}
+```
+
+```
+    public static void main(String[] args) {
+        Object lock = new Object();
+        LockThread thread = new LockThread(lock);
+        thread.start();
+
+        System.out.println("--- before sleep ---");
+
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("--- after sleep ---");
+
+        synchronized (lock) {
+            lock.notify();
+        }
+
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+```
+从上面的例子可以看出来,在调用wait()方法实际上已经释放了对象的锁,所以在其他线程中才能获取到这个对象的锁,从而进行notify操作。而等待的线程被唤醒后又需要重新获得对象的锁。
+
+### synchronized容易犯的隐蔽错误
+
+#### 是否给同一个对象加锁
+
+在用synchronized给对象加锁的时候需要注意加锁是不是同一个,如将代码改成这样:
+```
+    public static void main(String[] args) {
+        Thread t1 = new Thread(new Count());
+        Thread t2 = new Thread(new Count());
+        t1.start();
+        t2.start();
+        try {
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.print(Count.getCount());
+    }
+```
+因为两个线程跑的是不同的Count实例,所以用给指定对象加锁和给实例方法加锁的方法都不能避免两个线程同时对静态成员变量sCount进行自增操作。
+
+但是如果用第三种作用于静态方法的写法,就能正确的加锁。
+
+#### 是否给错误的对象加锁
