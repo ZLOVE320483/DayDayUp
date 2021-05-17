@@ -196,3 +196,106 @@ public class LockThread extends Thread {
 但是如果用第三种作用于静态方法的写法,就能正确的加锁。
 
 #### 是否给错误的对象加锁
+
+如我们将sCount的类型改成Integer,并且在sCount++的时候直接对sCount加锁会发生什么事情呢(毕竟我们会很自然的给要操作的对象加锁来实现线程同步)？
+```
+public class Count implements Runnable {
+
+    private static Integer sCount = 0;
+
+    public static int getCount() {
+        return sCount;
+    }
+
+    @Override
+    public void run() {
+        for (int i = 0; i < 1000; i++) {
+            synchronized (sCount) {
+                sCount++;
+            }
+        }
+    }
+
+}
+```
+```
+    public static void main(String[] args) {
+        Count count = new Count();
+        Thread t1 = new Thread(count);
+        Thread t2 = new Thread(count);
+        t1.start();
+        t2.start();
+        try {
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.print(Count.getCount());
+    }
+```
+最后的得到的结果仍然是比2000小的值。这是为什么呢？
+
+> 在Java中,Integer使用不变对象。也就是对象一旦被创建,就不可能被修改。也就是说,如果你有一个Integer代表1,那么它就永远是1,你不可能改变Integer的值,使它位。那如果你需要2怎么办呢？也很简单,新建一个Integer,并让它表示2即可。
+
+也就是说sCount在真实执行时变成了:
+
+```sCount = Integer.valueOf(sCount.intValue()+1);```
+
+进一步看Integer.valueOf()，我们可以看到:
+
+```
+public static Integer valueOf(int i) {
+    assert IntegerCache.high >= 127;
+    if (i >= IntegerCache.low && i <= IntegerCache.high)
+        return IntegerCache.cache[i + (-IntegerCache.low)];
+    return new Integer(i);
+}
+```
+
+所以在多个线程中,由于sCount一直在变,并不是同一个对象,所以两个线程的加锁可能加在了不同的Integer对象上,并没有真正的锁住代码块。
+
+### 重入锁
+ReentrantLock的意思是Re-Entrant-Lock也就是重入锁,它的特点就是在同一个线程中可以重复加锁,只需要解锁同样的次数就能真正解锁:
+```
+public class ReentrantLockThread extends Thread {
+
+    private ReentrantLock mLock = new ReentrantLock();
+
+    @Override
+    public void run() {
+        super.run();
+        mLock.lock();
+        System.out.println("--- outside ---");
+        mLock.lock();
+        System.out.println("--- inside ----");
+        mLock.unlock();
+        mLock.unlock();
+    }
+}
+
+
+```
+
+事实上synchronized也是可重入的,比如下面的代码同样是可以正常退出的:
+
+
+```
+public class SynchronizedThread extends Thread {
+
+    @Override
+    public void run() {
+        super.run();
+        synchronized (this) {
+            System.out.println("--- outside ---");
+            synchronized (this) {
+                System.out.println("--- inside ----");
+            }
+        }
+    }
+}
+```
+
+与synchronized相比,重入锁需要程序员手动调用加锁和解锁,也因为如此,重入锁对逻辑控制的灵活性要远远好于synchronized。
+
+重入锁可以完全替代synchronized关键字。在JDK 5.0的早起版本中,重入锁的性能远远好于synchronized。但从JDK 6.0开始,JDK在synchronized做了大量优化,使得两者的性能差距并不大。
