@@ -75,5 +75,22 @@ public void buildDog() {
 
 ![循环引用](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/java_class_lifecycle_1.jpeg)
 
+当buildDog return后，之前所占用的栈的一帧消失了，虽然Dog和Tail相互强引用，但是他们都不是gc root也没有被gc root强引用，所以成为待回收对象。
+
+
+![循环引用](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/java_class_lifecycle_2.jpeg)
+
+### 收集阶段（Collected）
+
+当垃圾回收器发现该对象已经处于“不可达阶段”并且垃圾回收器已经对该对象的内存空间重新分配做好准备时，对象进入“收集阶段”。如果该对象已经重写了finalize()方法，并且没有被执行过，则执行该方法的操作。否则直接进入终结阶段。
+
+### 终结阶段（Finalized）
+
+当对象执行完finalize()方法后仍然处于不可达状态时，该对象进入终结阶段。在该阶段，等待垃圾回收器回收该对象空间。
+
+### 重新分配阶段（Deallocated）
+
+如果在完成上述所有工作完成后对象仍不可达，则垃圾回收器对该对象的所占用的内存空间进行回收或者再分配，该对象彻底消失。
+
 
 
