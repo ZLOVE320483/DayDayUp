@@ -46,4 +46,4 @@ pool-1-thread-3 -> Running...
 
 - 流程图
 
-![类加载过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/java_thread_pool_1.jpeg)
+![类加载过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/java_thread_pool_1.png)
