@@ -356,3 +356,128 @@ startNestedScroll(int axes)方法实质上是通过代理的方式，把逻辑�
     }
 ```
 
+首先调用了NestedScrollingChild接口的实现方法hasNestedScrollingParent()，其内部逻辑是判断mNestedScrollingParent是否等于null，如果不是，则代表嵌套滑动已经开始，就直接return true,不继续往下走。
+
+一般开始的时候mNestedScrollingParent在这里都是还没赋值，是为null的，所以可以继续往下走，接下来通过NestedScrollingChild接口的isNestedScrollingEnabled()方法判断是不是支持NestedScrolling，这里默认是为ture，所以我们继续往下走。
+
+接下来调用了mView.getParent()，通过查看RecyclerView的getScrollingChildHelper()方法，以及NestedScrollingChildHelper的构造函数可知，其实就是调用了RecyclerView的getParent()方法，而RecyclerView的父布局是CoordinatorLayout，所以得到的ViewParent p就是CoordinatorLayout。
+
+然后在while循环中通过ViewParentCompat.onStartNestedScroll(p, child, mView, axes)方法不断寻找需要接收处理RecyclerView分发过来的事件的父布局，如果找到了，就返回true,这时候就会执行if语句中的代码，把接收事件的父布局赋值mNestedScrollingParent。并且调用ViewParentCompat.onNestedScrollAccepted(p, child, mView, axes)，并且最后整个方法再返回true，startNestedScroll方法就算是跑完了。
+
+在我们的示例代码中，while循环就只执行一次，把CoordinatorLayout、RecyclerView和axes作为值传了进去。在这里child和mView都是同一个RecyclerView。
+
+既然while循环只执行一次，那就代表ViewParentCompat.onStartNestedScroll(p, child, mView, axes)方法在第一次执行的时候就已经返回true了,也就是代表RecyclerView的直接父布局CoordinatorLayout会接收处理RecyclerView分发过来的事件。那么我们就来看下ViewParentCompat.onStartNestedScroll到底写了什么逻辑。为了方便，我们分析5.0以上的源码（与5.0以下的源码的主要区别在于5.0以下的源码多做了一些版本兼容工作）。
+
+```
+class ViewParentCompatLollipop {
+    private static final String TAG = "ViewParentCompat";
+ 
+    public static boolean onStartNestedScroll(ViewParent parent, View child, View target,
+            int nestedScrollAxes) {
+        try {
+            return parent.onStartNestedScroll(child, target, nestedScrollAxes);
+        } catch (AbstractMethodError e) {
+            Log.e(TAG, "ViewParent " + parent + " does not implement interface " +
+                    "method onStartNestedScroll", e);
+            return false;
+        }
+    }
+ 
+    ......
+ 
+}
+```
+
+在ViewParentCompatLollipop的onStartNestedScroll方法中，其实主要就一句话：
+
+```
+『return parent.onStartNestedScroll(child, target, nestedScrollAxes)；』
+```
+
+这个parent则是从ViewParentCompat.onStartNestedScroll(p, child, mView, axes)方法传过来的p,也就是CoordinatorLayout。
+
+通过这么一系列的调用，最终从RecyclerView的startNestedScroll方法，调用到了CoordinatorLayout的onStartNestedScroll方法。那么接下来我们就去看下CoordinatorLayout的onStartNestedScroll方法中做了什么。
+
+```
+    @Override
+    public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
+        boolean handled = false;
+ 
+        final int childCount = getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            final View view = getChildAt(i);
+            final LayoutParams lp = (LayoutParams) view.getLayoutParams();
+            final Behavior viewBehavior = lp.getBehavior();
+            if (viewBehavior != null) {
+                final boolean accepted = viewBehavior.onStartNestedScroll(this, view, child, target,
+                        nestedScrollAxes);
+                handled |= accepted;
+ 
+                lp.acceptNestedScroll(accepted);
+            } else {
+                lp.acceptNestedScroll(false);
+            }
+        }
+        return handled;
+    }
+```
+
+在这个方法中，CoordinatorLayout遍历了它的子布局并获取对应的Behavior，如果Behavior不为空，则根据该Behavior的onStartNestedScroll来决定是否把接收来的事件发放给该Behavior所属的View，并返回Behavior的onStartNestedScroll方法的返回值。由于handled |= accepted，只要有一个Behavior的onStartNestedScroll方法返回true，handled就会是ture。
+
+也就是：AppBarLayout是否接收事件并处理，是RecyclerView通过嵌套滑动原理，把事件传给CoordinatorLayout，CoordinatorLayout通过遍历自身的子布局，找到了AppBarLayout，并根据AppBarLayout的Behavior是否对事件感兴趣来决定。
+
+在我们这个实例中一共有两个View设置了Behavior，究竟是哪个Behavior处理了事件呢？我们先去看下AppBarLayout的Behavior的源码。AppBarLayout的Behavior我们在上面也已经说过了，是通过注解设置的『@CoordinatorLayout.DefaultBehavior(AppBarLayout.Behavior.class)』
+
+我们接下来到AppBarLayout.Behavior里看看它的onStartNestedScroll做了些什么。
+
+```
+        @Override
+        public boolean onStartNestedScroll(CoordinatorLayout parent, AppBarLayout child,
+                View directTargetChild, View target, int nestedScrollAxes) {
+            // Return true if we're nested scrolling vertically, and we have scrollable children
+            // and the scrolling view is big enough to scroll
+            final boolean started = (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0
+                    && child.hasScrollableChildren()
+                    && parent.getHeight() - directTargetChild.getHeight() <= child.getHeight();
+ 
+            if (started && mOffsetAnimator != null) {
+                // Cancel any offset animation
+                mOffsetAnimator.cancel();
+            }
+ 
+            // A new nested scroll has started so clear out the previous ref
+            mLastNestedScrollingChildRef = null;
+ 
+            return started;
+        }
+```
+
+该方法最终返回一个布尔值started，只有当可垂直滑动、AppBarLayout里有可以滑动的子View、并且CoordinatorLayout的高减去RecyclerView的高小于等于AppBarLayout的高的时候，started等于true，这些条件在上面的事例中都是符合的，因此最终AppBarLayout.Behavior的onStartNestedScroll方法返回true，也就是嵌套滑动的事件交给了AppBarLayout处理。
+
+我们再去看下RecyclerView中设置的ScrollingViewBehavior的源码，ScrollingViewBehavior以及它的父类并没有重写onStartNestedScroll，所以它的onStartNestedScroll方法既是CoordinatorLayout.Behavior：
+
+```
+        public boolean onStartNestedScroll(CoordinatorLayout coordinatorLayout,
+                V child, View directTargetChild, View target, int nestedScrollAxes) {
+            return false;
+        }
+```
+
+我们可以看到，ScrollingViewBehavior的onStartNestedScroll方法居然直接返回false了，也就是说它肯定是不会接收通过该方法传来的事件了。
+
+就这样，Down事件就大致分析完了。在Down事件中主要是决定嵌套滑动的接收者，以及对相应的View进行标记，方便Move事件的相关滑动操作。
+
+Down事件分析完了，接下来我们就来分析Move事件，由于代码比较长，我就只截取一部分:
+
+
+
+
+
+
+
+
+
+
+
+
+
