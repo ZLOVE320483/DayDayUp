@@ -469,15 +469,131 @@ class ViewParentCompatLollipop {
 
 Down事件分析完了，接下来我们就来分析Move事件，由于代码比较长，我就只截取一部分:
 
+```
+            case MotionEvent.ACTION_MOVE: {
+ 
+                ......
+ 
+                if (dispatchNestedPreScroll(dx, dy, mScrollConsumed, mScrollOffset)) {
+                    dx -= mScrollConsumed[0];
+                    dy -= mScrollConsumed[1];
+                    vtev.offsetLocation(mScrollOffset[0], mScrollOffset[1]);
+                    // Updated the nested offsets
+                    mNestedOffsets[0] += mScrollOffset[0];
+                    mNestedOffsets[1] += mScrollOffset[1];
+                }
+ 
+                ......
+ 
+                break;
+            }
+```
 
+我们主要关注NestedScrollingParent接口的dispatchNestedPreScroll(dx, dy, mScrollConsumed, mScrollOffset)方法，该方法最终调用到CoordinatorLayout的onNestedPreScroll方法，CoordinatorLayout的onNestedPreScroll又会调用到AppBarLayout.Behavir的onNestedPreScroll，调用流程跟Down事件差不多，具体原理限于篇幅就不再分析了，我们主要dispatchNestedPreScroll方法主要实现了什么功能。
 
+该方法主要是决定是否需要把Coordinatorlayout接收到的事件分发给AppBarLayout。假设AppBarLayout中的Toolbar已经完全显示了，而此时RecycleView是在往下滑，这时候Toolbar完全不需要接收事件使自己显示，此时dispatchNestedPreScroll就会返回false。
 
+接下来我们来关注dispatchNestedPreScroll方法的参数，前两个分别是横坐标和纵坐标的偏移量，这没啥好解释的，我们主要来分析后两个参数的作用。后两个参数分别是父view消费掉的 scroll长度（CoordinatorLayout分发给AppBarlayout消费掉）和子View（RecycleView）的窗体偏移量。
 
+如果dispatchNestedPreScroll返回true，则会根据后两个参数来进行修正，例如通过mScrollConsumed更新dx和dy，以及通过mScrollOffset更新RecycleView的窗体偏移量。
 
+假设RecyclerView的滚动事件没有被消费完，在RecycleView的Move事件最后scrollByInternal方法会继续处理剩下的滚动事件，并调用NestedScrollingChild接口的dispatchNestedScroll方法，而且最终还是会通过NestedScrollingParent的onNestedScroll调用到Behavior的对应方法。scrollByInternal方法部分核心代码如下：
 
+```
+            ......
+ 
+            if (x != 0) {
+                consumedX = mLayout.scrollHorizontallyBy(x, mRecycler, mState);
+                unconsumedX = x - consumedX;
+            }
+            if (y != 0) {
+                consumedY = mLayout.scrollVerticallyBy(y, mRecycler, mState);
+                unconsumedY = y - consumedY;
+            }
+ 
+            ......
+ 
+            if (dispatchNestedScroll(consumedX, consumedY, unconsumedX, unconsumedY, mScrollOffset)) {
+                // Update the last touch co-ords, taking any scroll offset into account
+                mLastTouchX -= mScrollOffset[0];
+                mLastTouchY -= mScrollOffset[1];
+                if (ev != null) {
+                    ev.offsetLocation(mScrollOffset[0], mScrollOffset[1]);
+                }
+                mNestedOffsets[0] += mScrollOffset[0];
+                mNestedOffsets[1] += mScrollOffset[1];
+ 
+                ......
+ 
+            }
+```
 
+RecyclerView处理了剩余的滚动距离之后，计算出对剩余滚动事件的消费情况，通过 dispatchNestedScroll 方法分发给CoordinatorLayout，CoordinatorLayout 则通过 onNestedScroll 方法分发给感兴趣的 子View 的 Behavior 处理。然后根据mScrollOffset更新窗体偏移量。具体实现可以自行去查看源码。
 
+最后我们来分析Up事件，先来看代码：
 
+```
+            case MotionEvent.ACTION_UP: {
+                mVelocityTracker.addMovement(vtev);
+                eventAddedToVelocityTracker = true;
+                mVelocityTracker.computeCurrentVelocity(1000, mMaxFlingVelocity);
+                final float xvel = canScrollHorizontally ?
+                        -VelocityTrackerCompat.getXVelocity(mVelocityTracker, mScrollPointerId) : 0;
+                final float yvel = canScrollVertically ?
+                        -VelocityTrackerCompat.getYVelocity(mVelocityTracker, mScrollPointerId) : 0;
+                if (!((xvel != 0 || yvel != 0) && fling((int) xvel, (int) yvel))) {
+                    setScrollState(SCROLL_STATE_IDLE);
+                }
+                resetTouch();
+            } break;
+```
 
+在Up事件最后一行中调用了resetTouch()，而resetTouch又调用了NestedScrollingChild的stopNestedScroll()，然后又是跟上面的流程一样一路调用到NestedScrollingParent的onStopNestedScroll方法，然后再调用对应的Behavior的onStopNestedScroll方法，流程都类似，就不贴代码了。
 
+在Stop的这一流程中主要是将之前在Start流程中的设置清空，比如将mNestedScrollingParent = null（不执行这句的话嵌套滑动就执行不起来了，具体可参考NestedScrollingChild的startNestedScroll方法第一行）。
 
+由嵌套滑动机制和AppBarLayout.Behavior共同工作完成的Toolbar上下滚动效果的原理就分析到这吧。
+
+- RecycleView一直保持在AppBarLayout下方原理
+
+接下来我们再通过源码分析下RecycleView是如何一直保持在AppBarLayout下方的吧。
+
+在文章开头我已经简单分析过ScrollingViewBehavior主要是依靠layoutDependsOn和onDependentViewChanged方法监听并响应的。ScrollingViewBehavior的layoutDependsOn方法：
+
+```
+        @Override
+        public boolean layoutDependsOn(CoordinatorLayout parent, View child, View dependency) {
+            // We depend on any AppBarLayouts
+            return dependency instanceof AppBarLayout;
+        }
+```
+
+很明显，ScrollingViewBehavior就是依赖于AppBarLayout的，那么我们来看下onDependentViewChanged方法：
+
+```
+        @Override
+        public boolean onDependentViewChanged(CoordinatorLayout parent, View child,
+                View dependency) {
+            offsetChildAsNeeded(parent, child, dependency);
+            return false;
+        }
+ 
+        ......
+ 
+ 
+        private void offsetChildAsNeeded(CoordinatorLayout parent, View child, View dependency) {
+            final CoordinatorLayout.Behavior behavior =
+                    ((CoordinatorLayout.LayoutParams) dependency.getLayoutParams()).getBehavior();
+            if (behavior instanceof Behavior) {
+                // Offset the child, pinning it to the bottom the header-dependency, maintaining
+                // any vertical gap and overlap
+                final Behavior ablBehavior = (Behavior) behavior;
+                ViewCompat.offsetTopAndBottom(child, (dependency.getBottom() - child.getTop())
+                        + ablBehavior.mOffsetDelta
+                        + getVerticalLayoutGap()
+                        - getOverlapPixelsForOffset(dependency));
+            }
+        }
+```
+
+这两个方法在CoordinatorLayout的onChildViewsChanged会被调用到，而每次重绘时，都会调用onChildViewsChanged，从而使其一直位于AppBarLayout的下方。
