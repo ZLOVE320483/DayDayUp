@@ -274,4 +274,85 @@ onStartNestedScroll决定Behavior是否接收嵌套滑动机制传过来的事�
 
 总结：当我们滑动RecyclerView时，Toolbar能上下滚动是由嵌套滑动机制和AppBarLayout.Behavior共同工作完成的。而在Toolbar上下滚动时，RecyclerView也能始终保持在其正下方的功能是由ScrollingViewBehavior实现的。
 
+### 源码分析
+
+- Toolbar能随RecycleView上下滚动原理
+
+我们先来分析一下RecyclerView是如何把滑动事件传给CoordinatorLayout，即NestedScrollingChild把事件传给NestedScrollingParent，以及接收到事件的CoordinatorLayout又如何把事件分发到AppBarLayout的Behavior上。
+
+事件分发是从Down开始的，因此我们先从RecyclerView的Down事件开始分析
+
+```
+    @Override
+    public boolean onTouchEvent(MotionEvent e) {
+ 
+        ......
+ 
+        switch (action) {
+            case MotionEvent.ACTION_DOWN: {
+                mScrollPointerId = e.getPointerId(0);
+                mInitialTouchX = mLastTouchX = (int) (e.getX() + 0.5f);
+                mInitialTouchY = mLastTouchY = (int) (e.getY() + 0.5f);
+ 
+                int nestedScrollAxis = ViewCompat.SCROLL_AXIS_NONE;
+                if (canScrollHorizontally) {
+                    nestedScrollAxis |= ViewCompat.SCROLL_AXIS_HORIZONTAL;
+                }
+                if (canScrollVertically) {
+                    nestedScrollAxis |= ViewCompat.SCROLL_AXIS_VERTICAL;
+                }
+                startNestedScroll(nestedScrollAxis);
+            } break;
+ 
+        ......
+ 
+    }
+```
+
+可以看到在RecyclerView的Down事件的最后一行，我们调用了NestedScrollingChild接口的startNestedScroll(nestedScrollAxis)方法，并把支持的滚动方向作为参数传了进去，这个方法也是嵌套滑动机制中被调用的第一个方法，在这个方法内会决定是否启用嵌套滑动，以及谁来接收处理嵌套滑动传过来的事件。
+
+然后我们来看看startNestedScroll(nestedScrollAxis)方法的内部实现。
+
+```
+    @Override
+    public boolean startNestedScroll(int axes) {
+        return getScrollingChildHelper().startNestedScroll(axes);
+    }
+ 
+    ......
+ 
+    private NestedScrollingChildHelper getScrollingChildHelper() {
+        if (mScrollingChildHelper == null) {
+            mScrollingChildHelper = new NestedScrollingChildHelper(this);
+        }
+        return mScrollingChildHelper;
+    }
+```
+
+startNestedScroll(int axes)方法实质上是通过代理的方式，把逻辑委托给了NestedScrollingChildHelper。那么我们来看下NestedScrollingChildHelper的startNestedScroll(int axes)做了什么：
+
+```
+    public boolean startNestedScroll(int axes) {
+        if (hasNestedScrollingParent()) {
+            // Already in progress
+            return true;
+        }
+        if (isNestedScrollingEnabled()) {
+            ViewParent p = mView.getParent();
+            View child = mView;
+            while (p != null) {
+                if (ViewParentCompat.onStartNestedScroll(p, child, mView, axes)) {
+                    mNestedScrollingParent = p;
+                    ViewParentCompat.onNestedScrollAccepted(p, child, mView, axes);
+                    return true;
+                }
+                if (p instanceof View) {
+                    child = (View) p;
+                }
+                p = p.getParent();
+            }
+        }
+        return false;
+    }
+```
 
