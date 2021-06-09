@@ -1,0 +1,5 @@
+## Android中的ClassLoader
+
+Android中的ClassLoader和java中的是不一样的，因为java中的CalssLoader主要加载Class文件，但是Android中的ClassLoader主要加载dex文件。
+
+### Android中的ClassLoader
