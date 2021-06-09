@@ -45,3 +45,81 @@ Activity 中的 startActivity 最终都是由 startActivityForResult 来实现�
     }
 
 ```
+
+我们看注释1处，调用了mInstrumentation.execStartActivity,来启动Activity，这个mInstrumentation是Activity成员变量，我们选择mInstrumentation作为Hook点。
+
+- 首先先写出代理Instrumentation类
+
+```
+public class ProxyInstrumentation extends Instrumentation {
+
+    private final Instrumentation instrumentation;
+
+    public ProxyInstrumentation(Instrumentation instrumentation){
+        this.instrumentation=instrumentation;
+    }
+
+    public ActivityResult execStartActivity(
+            Context who, IBinder contextThread, IBinder token, Activity target,
+            Intent intent, int requestCode, Bundle options) {
+
+
+        Log.d("mmm", "Hook成功，执行了startActivity"+who);
+
+        Intent replaceIntent = new Intent(target, TextActivity.class);
+        replaceIntent.putExtra(TextActivity.TARGET_COMPONENT, intent);
+        intent = replaceIntent;
+
+        try {
+            Method execStartActivity = Instrumentation.class.getDeclaredMethod(
+                    "execStartActivity",
+                    Context.class,
+                    IBinder.class,
+                    IBinder.class,
+                    Activity.class,
+                    Intent.class,
+                    int.class,
+                    Bundle.class);
+            return (ActivityResult) execStartActivity.invoke(instrumentation, who, contextThread, token, target, intent, requestCode, options);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+}
+```
+
+ProxyInstrumentation类继承Instrumentation,并包含原始Instrumentation的引用，实现了execStartActivity方法，其内部会打印log并且反射调用原始Instrumentation对象的execStartActivity方法。
+
+接下来我们用ProxyInstrumentation类替换原始的Instrumentation,代码如下：
+
+```
+    public static void doInstrumentationHook(Activity activity){
+        // 拿到原始的 mInstrumentation字段
+        Field mInstrumentationField = null;
+        try {
+            mInstrumentationField = Activity.class.getDeclaredField("mInstrumentation");
+            mInstrumentationField.setAccessible(true);
+
+            // 创建代理对象
+            Instrumentation originalInstrumentation = (Instrumentation) mInstrumentationField.get(activity);
+            mInstrumentationField.set(activity, new ProxyInstrumentation(originalInstrumentation));
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    }
+```
+
+然后再MainActivity中调用这个方法
+
+```
+  protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        ProxyUtils.doInstrumentationHook(this);
+    }
+```
