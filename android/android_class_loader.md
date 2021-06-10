@@ -108,3 +108,49 @@ java.lang.BootClassLoader@fcb14c9
 除了上方的3中ClassLoader，Android还提供了其他的类加载器和ClassLoader相关类，继承关系如下：
 
 ![类继承关系](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/android_classloader_1.jpeg)
+
+分别介绍一下上方的8种ClassLoader
+
+> - ClassLoader是一个抽象类，其中定义了ClassLoder的主要功能，BootClassLoader是他的内部类
+> -	SecureClassLoader和JDK8中的SecureClassLoader代码是一样的，他继承抽象类ClassLoader，SecureClassLoader并不是ClassLoader的实现类，而是扩展了ClassLoader权限方面的功能，加强了Classloader的安全性
+> - URLClassLoader和JDK8中的URLClassLoader是一样的，他继承了SecureClassLoader通能过URL路径从jar文件中加载类和资源
+> - InMemoryDexClassLoader他是Android8.0新加的类加载器，继承自BaseDexClassLoader，用于加载内存中的dex文件
+> - BaseDexClassLoader继承自ClassLoader，是抽象类ClassLoader的具体实现类
+
+### ClassLoader的加载过程
+
+Android中的ClassLoader同样遵循双亲委托模型，ClassLoader的加载方法为loadClass,方法定义在ClassLoader中
+
+```
+protected Class<?> loadClass(String name, boolean resolve)
+        throws ClassNotFoundException{
+            // 首先检查类是否被加载过
+            Class<?> c = findLoadedClass(name);
+            if (c == null) {
+                try {
+                    if (parent != null) {
+                        c = parent.loadClass(name, false);
+                    } else {
+                        c = findBootstrapClassOrNull(name);
+                    }
+                } catch (ClassNotFoundException e) {
+                    //如果父类抛出ClassNotFoundException异常
+                    //则说明父类不能加载该类
+                }
+
+                if (c == null) {
+                    //如果父类无法加载，则调用自身的findClass进行加
+                    c = findClass(name);
+                }
+            }
+            return c;
+    }
+```
+
+上方逻辑很清楚，首先检查类是否被加载过，如果没有被加载过，就调用父类的加载器加载，如果父类加载器为空就调用启动加载器加载，如果父类加载失败，就调用自己的findClass加载,我们看一下这个方法
+
+```
+  protected Class<?> findClass(String name) throws ClassNotFoundException {
+        throw new ClassNotFoundException(name);
+    }
+```
