@@ -154,3 +154,131 @@ protected Class<?> loadClass(String name, boolean resolve)
         throw new ClassNotFoundException(name);
     }
 ```
+
+直接抛出异常，这说明findClass需要子类BaseDexClassLoader实现，如下：
+
+```
+  public BaseDexClassLoader(String dexPath, File optimizedDirectory,
+            String librarySearchPath, ClassLoader parent) {
+        super(parent);
+        this.pathList = new DexPathList(this, dexPath, librarySearchPath, null);
+
+        if (reporter != null) {
+            reporter.report(this.pathList.getDexPaths());
+        }
+    }
+    
+    ...
+    
+      @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        List<Throwable> suppressedExceptions = new ArrayList<Throwable>();
+        //注释1
+        Class c = pathList.findClass(name, suppressedExceptions);
+        if (c == null) {
+            ClassNotFoundException cnfe = new ClassNotFoundException(
+                    "Didn't find class \"" + name + "\" on path: " + pathList);
+            for (Throwable t : suppressedExceptions) {
+                cnfe.addSuppressed(t);
+            }
+            throw cnfe;
+        }
+        return c;
+    }
+```
+
+首先在构造方法内创建了DexPathList，然后再注释1处调用DexPathList的findClass方法
+
+```
+  public DexPathList(ClassLoader definingContext, String dexPath,
+            String librarySearchPath, File optimizedDirectory) {
+         ....
+
+        this.definingContext = definingContext;
+
+        ArrayList<IOException> suppressedExceptions = new ArrayList<IOException>();
+        // 创建dexElements
+        this.dexElements = makeDexElements(splitDexPath(dexPath), optimizedDirectory,
+                                           suppressedExceptions, definingContext);
+            ....
+    }
+    
+    
+ public Class<?> findClass(String name, List<Throwable> suppressed) {      //注释1
+        for (Element element : dexElements) {
+            //注释2
+            Class<?> clazz = element.findClass(name, definingContext, suppressed);
+            if (clazz != null) {
+                return clazz;
+            }
+        }
+
+        if (dexElementsSuppressedExceptions != null) {
+            suppressed.addAll(Arrays.asList(dexElementsSuppressedExceptions));
+        }
+        return null;
+    }
+```
+
+我们看到在构造方法中调用makeDexElements，为dexElements数组赋值然后，在注释1处遍历dexElements数组，在注释2处调用Element的findClass方法
+
+```
+public Element(File dir, boolean isDirectory, File zip, DexFile dexFile) {
+            System.err.println("Warning: Using deprecated Element constructor. Do not use internal"
+                    + " APIs, this constructor will be removed in the future.");
+            if (dir != null && (zip != null || dexFile != null)) {
+                throw new IllegalArgumentException("Using dir and zip|dexFile no longer"
+                        + " supported.");
+            }
+            if (isDirectory && (zip != null || dexFile != null)) {
+                throw new IllegalArgumentException("Unsupported argument combination.");
+            }
+            if (dir != null) {
+                this.path = dir;
+                this.dexFile = null;
+            } else {
+                this.path = zip;
+                this.dexFile = dexFile;
+            }
+        }
+        ...
+        
+        
+            public Class<?> findClass(String name, ClassLoader definingContext,
+                List<Throwable> suppressed) {
+            //注释1
+            return dexFile != null ? dexFile.loadClassBinaryName(name, definingContext, suppressed)
+                    : null;
+        }
+```
+
+我们从构造方法可以看出，它内部封装了DexFile，他用于加载dex，注释1处如果dexFile不为null则调用DexFile的loadClassBinaryName方法
+
+```
+ public Class loadClassBinaryName(String name, ClassLoader loader, List<Throwable> suppressed) {
+        return defineClass(name, loader, mCookie, this, suppressed);
+    }
+```
+
+又调用了defineClass方法
+
+```
+ private static Class defineClass(String name, ClassLoader loader, Object cookie,
+                                     DexFile dexFile, List<Throwable> suppressed) {
+        Class result = null;
+        try {
+            //注释1
+            result = defineClassNative(name, loader, cookie, dexFile);
+        } catch (NoClassDefFoundError e) {
+            if (suppressed != null) {
+                suppressed.add(e);
+            }
+        } catch (ClassNotFoundException e) {
+            if (suppressed != null) {
+                suppressed.add(e);
+            }
+        }
+        return result;
+    }
+```
+注释1处调用了defineClassNative方法来加载dex相关文件，这个是native方法不在向下分析
