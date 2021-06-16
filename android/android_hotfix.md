@@ -25,3 +25,11 @@ if (ClassVerifier.PREVENT_VERIFY) {
 }
 ```
 >复制代码这样在 odex 过程中，每个类都会出现 AntilazyLoad 在另一个dex文件中的问题，所以odex的验证过程也就不会继续下去，这样做牺牲了dvm对dex的优化效果了。
+
+2. Tinker 原理
+
+对于Tinker，修复前和修复后的apk分别定义为apk1和apk2，tinker自研了一套dex文件差分合并算法，在生成补丁包时，生成一个差分包 patch.dex，后端下发patch.dex到客户端时，tinker会开一个线程把旧apk的class.dex和patch.dex合并，生成新的class.dex并存放在本地目录上，重新启动时，会使用本地新生成的class.dex对应的elements替换原有的elements数组。
+
+3. AndFix 原理
+
+AndFix的修复原理是替换方法的结构体。在native层获取修复前类和修复后类的指针，然后将旧方法的属性指针指向新方法。由于不同系统版本下的方法结构体不同，而且davilk与art虚拟机处理方式也不一样，所以需要针对不同系统针对性的替换方法结构体。
