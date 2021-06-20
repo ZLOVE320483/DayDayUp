@@ -209,3 +209,60 @@ try {
 ```PatchProxy.accessDispatchVoid``` 最终调用了 ```changeQuickRedirect.accessDispatch```。
 
 至此插桩环节就结束了。
+
+- 生成补丁包
+
+Robust 定义了一个 Modify 注解，
+
+```
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.TYPE, ElementType.CONSTRUCTOR})
+@Retention(RetentionPolicy.CLASS)
+@Documented
+public @interface Modify {
+    String value() default "";
+}
+```
+
+对于要修复的方法，直接在方法声明时增加 Modify注解
+
+```
+@Modify
+public String getTextInfo() {
+    getArray();
+    //return "error occur " ;
+    return "error fixed";
+}
+```
+
+在编译期间，Robust逐一遍历所有类，如果这个类有方法需要修复，Robust 会生一个 xxPatch 的类：
+
+
+1. 第一步 根据bug类 clone 出 Patch 类， 然后再删除不需要打补丁的类。（为什么使用删除方法而不是新增方法？ 删除更简单）
+2. 第二步 为 Patch 创建一个构造方法，用来接收bug类的实例对象。
+3. 遍历 Patch 类中的所有方法，使用 ExprEditor + 反射 修改表达式。
+4. 删除 Patch 类中所有的变量和父类。
+
+这里举个例子，为什么这里的处理这么麻烦。
+
+```
+public class Test {
+    private int num = 0;
+    public void increase() {
+        num += 1;
+    }
+    public void decrease() {
+        // 这里减错了
+        num -= 2;
+    }
+    public static void main(String[] args) {
+        Test t1 = new Test();
+        // 执行完 num=1
+        t1.increase();
+        // 执行完 num=2
+        t1.increase();
+        // 执行完 num=0， decrease 方法出现了bug，我们本意是减1，结果减2了
+        t1.decrease();
+    }
+}
+```
+
