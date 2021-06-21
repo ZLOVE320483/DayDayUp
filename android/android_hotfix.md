@@ -266,3 +266,145 @@ public class Test {
 }
 ```
 
+所以当我们下发补丁时，对num进行减1的操作也是针对t1对象的num操作。这就是为什么我们需要创建一个构造方案接受bug类实例对象。再来说下，我们如何在 TestPatch 类中把所有对 TestPatch 变量和方法等调用迁移到 Test 上。这就需要使用到 ExprEditor (表达式编辑器)。
+
+```
+// 这个 method 就是 TestPatch 修复后的那个方法
+method.instrument(
+    new ExprEditor() {
+        // 处理变量访问
+        public void edit(FieldAccess f) throws CannotCompileException {
+            if (Config.newlyAddedClassNameList.contains(f.getClassName())) {
+                return;
+            }
+            Map memberMappingInfo = getClassMappingInfo(f.getField().declaringClass.name);
+            try {
+                // 如果是 读取变量，那么把 f 使用replace方法，替换成括号里的返回的表达式
+                if (f.isReader()) {
+                    f.replace(ReflectUtils.getFieldString(f.getField(), memberMappingInfo, temPatchClass.getName(), modifiedClass.getName()));
+                }
+                // 如果是 写数据到变量
+                else if (f.isWriter()) {
+                    f.replace(ReflectUtils.setFieldString(f.getField(), memberMappingInfo, temPatchClass.getName(), modifiedClass.getName()));
+                }
+            } catch (NotFoundException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage());
+            }
+        }
+    }
+)
+```
+
+ReflectUtils.getFieldString 方法调用的结果是生成一串类似这样的字符串：
+
+```
+\$_=(\$r) com.meituan.robust.utils.EnhancedRobustUtils.getFieldValue(fieldName, instance, clazz)
+```
+
+这样在 TestPatch 中对变量 num 的调用，在编译期间都会转为通过反射对 原始bug类对象 t1 的 num 变量调用。
+
+ExprEditor 除了变量访问 FieldAccess， 还有这些情况需要特殊处理。
+
+```
+public void edit(NewExpr e) throws CannotCompileException {
+}
+
+public void edit(MethodCall m) throws CannotCompileException {
+}
+
+public void edit(FieldAccess f) throws CannotCompileException {
+}
+
+public void edit(Cast c) throws CannotCompileException {
+}
+
+```
+
+需要处理的情况太多了，以致于Robust的作者都忍不住吐槽：
+shit !!too many situations need take into consideration
+生成完 Patch 类之后，Robust 会从模板类的基础上生成一个这个类专属的 ChangeQuickRedirect 类， 模板类代码如下：
+
+```
+public class PatchTemplate implements ChangeQuickRedirect {
+    public static final String MATCH_ALL_PARAMETER = "(\\w*\\.)*\\w*";
+
+    public PatchTemplate() {
+    }
+
+    private static final Map<Object, Object> keyToValueRelation = new WeakHashMap<>();
+
+    @Override
+    public Object accessDispatch(String methodName, Object[] paramArrayOfObject) {
+        return null;
+    }
+
+    @Override
+    public boolean isSupport(String methodName, Object[] paramArrayOfObject) {
+        return true;
+    }
+
+}
+```
+
+以Test类为例，生成 ChangeQuickRedirect 类名为 TestPatchController, 在编译期间会在 isSupport 方法前加入过滤逻辑，
+
+```
+// 根据方法的id判断是否是补丁方法执行
+public boolean isSupport(String methodName, Object[] paramArrayOfObject) {
+    return "23:".contains(methodName.split(":")[3]);
+}
+```
+以上两个类生成后，会生成一个维护 bug类 --> ChangeQuickRedirect 类的映射关系
+
+```
+public class PatchesInfoImpl implements PatchesInfo {
+    public List getPatchedClassesInfo() {
+        ArrayList arrayList = new ArrayList();
+        arrayList.add(new PatchedClassInfo("com.meituan.sample.Test", "com.meituan.robust.patch.TestPatchControl"));
+        EnhancedRobustUtils.isThrowable = false;
+        return arrayList;
+    }
+}
+```
+
+以一个类的一个方法修复生成补丁为例，补丁包中包含三个文件：
+
+> - TestPatch
+> - TestPatchController
+> - PatchesInfoImpl
+生成的补丁包是jar格式的，我们需要使用 jar2dex 将 jar 包转换成 dex包。
+
+- 加载补丁包
+
+当线上app反生bug后，可以通知客户端拉取对应的补丁包，下载补丁包完成后，会开一个线程执行以下操作：
+
+1. 使用 DexClassLoader 加载外部 dex 文件，也就是我们生成的补丁包。
+2. 反射获取 PatchesInfoImpl 中补丁包映射关系，如PatchedClassInfo("com.meituan.sample.Test", "com.meituan.robust.patch.TestPatchControl")。
+3. 反射获取 Test 类插桩生成 changeQuickRedirect 对象，实例化 TestPatchControl，并赋值给 changeQuickRedirect
+
+至此，bug就修复了，无需重启实时生效。
+
+- 一些问题
+
+a. Robust 导致Proguard 方法内联失效
+
+Proguard是一款代码优化、混淆利器，Proguard 会对程序进行优化，如果某个方法很短或者只被调用了一次，那么Proguard会把这个方法内部逻辑内联到调用处。 Robust的解决方案是找到内联方法，不对内联的方法插桩。
+
+b. lambada 表达式修复
+
+对于 lambada 表达式无法直接添加注解，Robust 提供了一个 RobustModify 类，modify 方法是空方法，再编译期间使用 ExprEditor 检测是否调用了 RobustModify 类，如果调用了，就认为这个方法需要修复。
+
+```
+new Thread(
+        () -> {
+            RobustModify.modify();
+            System.out.print("Hello");
+            System.out.println(" Hoolee");
+        }
+).start();
+```
+
+c. Robust 生成方法id是通过编译期间遍历所有类和方法，递增id实现的
+
+一个方法，可以通过类名 + 方法名 + 参数类型唯一确定。
