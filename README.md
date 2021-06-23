@@ -24,6 +24,7 @@
 7. [EventBus源码解析](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/eventbus.md)
 8. [CoordinateLayout和AppbarLayout联动原理](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/coordinatelayout.md)
 9. [Android ClassLoader](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/android_class_loader.md)
+10. [RecyclerView缓存机制](https://github.com/ZLOVE320483/DayDayUp/blob/main/android/recyclerview_cache.md)
 
 ## Network
 1. [浏览器输入URL后执行过程](https://github.com/ZLOVE320483/DayDayUp/blob/main/network/url_visit.md)
