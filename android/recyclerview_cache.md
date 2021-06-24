@@ -9,3 +9,9 @@ RecyclerView这个控件几乎所有的Android开发者都使用过（甚至不�
 关于这个问题，我们首先看一下ListView。ListView是不强制我们实现ViewHolder的，但是后来google建议我们实现ViewHolder模式。我们先分别看一下这两种不同的方式。
 
 ![不使用viewholder](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/rv_cache1.jpg)
+
+![使用viewholder](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/rv_cache2.jpg)
+
+其实这里我已经用红框标出来了，ListView使用ViewHolder的好处就在于可以避免每次getView都进行findViewById()操作，因为findViewById()利用的是DFS算法（深度优化搜索），是非常耗性能的。而对于RecyclerView来说，强制实现ViewHolder的其中一个原因就是避免多次进行findViewById（）的处理，另一个原因就是因为ItemView和ViewHolder的关系是一对一，也就是说一个ViewHolder对应一个ItemView。这个ViewHolder当中持有对应的ItemView的所有信息，比如说：position；view；width等等，拿到了ViewHolder基本就拿到了ItemView的所有信息，而ViewHolder使用起来相比itemView更加方便。RecyclerView缓存机制缓存的就是ViewHolder（ListView缓存的是ItemView），这也是为什么RecyclerView为什么强制我们实现ViewHolder的原因。
+
+### Listview的缓存机制
