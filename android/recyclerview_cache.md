@@ -19,3 +19,18 @@ RecyclerView这个控件几乎所有的Android开发者都使用过（甚至不�
 在正式讲RecyclerView的缓存机制之前还需要提一嘴ListView的缓存机制，不多BB，先上图
 
 ![listview缓存](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/rv_cache3.jpg)
+
+ListView的缓存有两级，在ListView里面有一个内部类 RecycleBin，RecycleBin有两个对象Active View和Scrap View来管理缓存，Active View是第一级，Scrap View是第二级。
+
+- **Active View:** 是缓存在屏幕内的ItemView，当列表数据发生变化时，屏幕内的数据可以直接拿来复用，无须进行数据绑定。
+- **Scrap view:** 缓存屏幕外的ItemView，这里所有的缓存的数据都是"脏的"，也就是数据需要重新绑定，也就是说屏幕外的所有数据在进入屏幕的时候都要走一遍getView（）方法。
+
+再来一张图，看看ListView的缓存流程
+
+![listview缓存流程](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/rv_cache4.jpg)
+
+当Active View和Scrap View中都没有缓存的时候就会直接create view。
+
+### 小结
+
+ListView的缓存机制相对比较好理解，它只有两级缓存，一级缓存Active View是负责屏幕内的ItemView快速复用，而Scrap View是缓存屏幕外的数据，当该数据从屏幕外滑动到屏幕内的时候需要走一遍getView()方法。
