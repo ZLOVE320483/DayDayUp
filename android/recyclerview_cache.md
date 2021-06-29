@@ -34,3 +34,9 @@ ListView的缓存有两级，在ListView里面有一个内部类 RecycleBin，Re
 ### 小结
 
 ListView的缓存机制相对比较好理解，它只有两级缓存，一级缓存Active View是负责屏幕内的ItemView快速复用，而Scrap View是缓存屏幕外的数据，当该数据从屏幕外滑动到屏幕内的时候需要走一遍getView()方法。
+
+### RecyclerView的缓存机制
+
+先上图
+
+![recyclerview缓存](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/rv_cache5.jpg)
