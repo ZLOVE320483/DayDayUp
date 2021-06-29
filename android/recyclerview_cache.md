@@ -40,3 +40,25 @@ ListView的缓存机制相对比较好理解，它只有两级缓存，一级缓
 先上图
 
 ![recyclerview缓存](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/rv_cache5.jpg)
+
+RecyclerView的缓存分为四级
+
+- **Scrap**
+- **Cache**
+- **ViewCacheExtension**
+- **RecycledviewPool**
+
+Scrap对应ListView 的Active View，就是屏幕内的缓存数据，就是相当于换了个名字，可以直接拿来复用。
+
+Cache 刚刚移出屏幕的缓存数据，默认大小是2个，当其容量被充满同时又有新的数据添加的时候，会根据FIFO原则，把优先进入的缓存数据移出并放到下一级缓存中，然后再把新的数据添加进来。Cache里面的数据是干净的，也就是携带了原来的ViewHolder的所有数据信息，数据可以直接来拿来复用。需要注意的是，cache是根据position来寻找数据的，这个postion是根据第一个或者最后一个可见的item的position以及用户操作行为（上拉还是下拉）。
+举个栗子：当前屏幕内第一个可见的item的position是1，用户进行了一个下拉操作，那么当前预测的position就相当于（1-1=0），也就是position=0的那个item要被拉回到屏幕，此时RecyclerView就从Cache里面找position=0的数据，如果找到了就直接拿来复用。
+
+ViewCacheExtension是google留给开发者自己来自定义缓存的，这个ViewCacheExtension我个人建议还是要慎用，因为我扒拉扒拉网上其他的博客，没有找到对应的使用场景。
+
+RecycledViewPool刚才说了Cache默认的缓存数量是2个，当Cache缓存满了以后会根据FIFO（先进先出）的规则把Cache先缓存进去的ViewHolder移出并缓存到RecycledViewPool中，RecycledViewPool默认的缓存数量是5个。RecycledViewPool与Cache相比不同的是，从Cache里面移出的ViewHolder再存入RecycledViewPool之前ViewHolder的数据会被全部重置，相当于一个新的ViewHolder，而且Cache是根据position来获取ViewHolder，而RecycledViewPool是根据itemType获取的，如果没有重写getItemType（）方法，itemType就是默认的。因为RecycledViewPool缓存的ViewHolder是全新的，所以取出来的时候需要走onBindViewHolder（）方法。
+
+再来张图看看整体流程
+
+![recyclerview缓存流程](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/rv_cache6.jpg)
+
+这里大家先记住主要流程，并且记住各级缓存是根据什么拿到ViewHolder以及ViewHolder能否直接拿来复用，先有一个整体的认识，下面我会带着大家再简单分析一下RecyclerView缓存机制的源码。
