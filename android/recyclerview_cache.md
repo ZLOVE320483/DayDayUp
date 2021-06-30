@@ -62,3 +62,165 @@ RecycledViewPool刚才说了Cache默认的缓存数量是2个，当Cache缓存�
 ![recyclerview缓存流程](https://github.com/ZLOVE320483/DayDayUp/blob/main/pic/rv_cache6.jpg)
 
 这里大家先记住主要流程，并且记住各级缓存是根据什么拿到ViewHolder以及ViewHolder能否直接拿来复用，先有一个整体的认识，下面我会带着大家再简单分析一下RecyclerView缓存机制的源码。
+
+### 阅读RecyclerView的缓存机制源码
+
+由于篇幅和内容的关系，我不可能带大家一行一行读，这里我只列出关键点，还有哪些需要重点看，哪些可以直接略过，避免大家陷入读源码一个劲儿钻进去出不来的误区。
+
+当RecyclerView绘制的时候，会走到LayoutManager里面的next()方法，在next()里面是正式开始使用缓存机制，这里以LinearLayoutManager为例子
+
+```
+        /**
+         * Gets the view for the next element that we should layout.
+         * Also updates current item index to the next item, based on {@link #mItemDirection}
+         *
+         * @return The next element that we should layout.
+         */
+        View next(RecyclerView.Recycler recycler) {
+            if (mScrapList != null) {
+                return nextViewFromScrapList();
+            }
+            final View view = recycler.getViewForPosition(mCurrentPosition);
+            mCurrentPosition += mItemDirection;
+            return view;
+        }
+```
+
+在next方法里传入了Recycler对象，这个对象是RecyclerView的内部类。我们先去看一眼这个类
+
+```
+ public final class Recycler {
+        final ArrayList<ViewHolder> mAttachedScrap = new ArrayList<>();
+        ArrayList<ViewHolder> mChangedScrap = null;
+
+        final ArrayList<ViewHolder> mCachedViews = new ArrayList<ViewHolder>();
+
+        private final List<ViewHolder>
+                mUnmodifiableAttachedScrap = Collections.unmodifiableList(mAttachedScrap);
+
+        private int mRequestedCacheMax = DEFAULT_CACHE_SIZE;
+        int mViewCacheMax = DEFAULT_CACHE_SIZE;
+
+        RecycledViewPool mRecyclerPool;
+
+        private ViewCacheExtension mViewCacheExtension;
+
+        static final int DEFAULT_CACHE_SIZE = 2;
+}
+```
+
+再看一眼RecycledViewPool的源码
+
+```
+public static class RecycledViewPool {
+        private static final int DEFAULT_MAX_SCRAP = 5;
+        static class ScrapData {
+            final ArrayList<ViewHolder> mScrapHeap = new ArrayList<>();
+            int mMaxScrap = DEFAULT_MAX_SCRAP;
+            long mCreateRunningAverageNs = 0;
+            long mBindRunningAverageNs = 0;
+        }
+        SparseArray<ScrapData> mScrap = new SparseArray<>();
+```
+
+其中mAttachedScrap对应Scrap；mCachedViews对应Cache；mViewCacheExtension对应ViewCacheExtension；mRecyclerPool对应RecycledViewPool。
+注意：mAttachedScrap、mCachedViews和RecycledViewPool里面的mScrapHeap都是ArrayList，缓存被加入到这三个对象里面实际上就是调用的ArrayList.add()方法，复用缓存呢，这里要注意一下不是调用的ArrayList.get（）而是ArrayList.remove(),其实这里也很好理解，因为当缓存数据被取出来展示到了屏幕内，自然就应该被移除。
+我们现在回到刚才的next（）方法里，recycler.getViewForPosition(mCurrentPosition); 直接去看getViewForPosition这个方法，接着跟到了这里
+
+```
+ View getViewForPosition(int position, boolean dryRun) {
+            return tryGetViewHolderForPositionByDeadline(position, dryRun, FOREVER_NS).itemView;
+        }
+```
+
+接着跟进去
+
+```
+  ViewHolder tryGetViewHolderForPositionByDeadline(int position,
+                boolean dryRun, long deadlineNs) {
+            if (position < 0 || position >= mState.getItemCount()) {
+                throw new IndexOutOfBoundsException("Invalid item position " + position
+                        + "(" + position + "). Item count:" + mState.getItemCount()
+                        + exceptionLabel());
+            }
+            boolean fromScrapOrHiddenOrCache = false;
+            ViewHolder holder = null;
+            // 0) If there is a changed scrap, try to find from there
+            if (mState.isPreLayout()) {
+                holder = getChangedScrapViewForPosition(position);
+                fromScrapOrHiddenOrCache = holder != null;
+            }
+            // 1) Find by position from scrap/hidden list/cache
+            if (holder == null) {
+                holder = getScrapOrHiddenOrCachedHolderForPosition(position, dryRun);
+             
+            }
+            if (holder == null) {
+                final int type = mAdapter.getItemViewType(offsetPosition);
+                // 2) Find from scrap/cache via stable ids, if exists
+                if (mAdapter.hasStableIds()) {
+                    holder = getScrapOrCachedViewForId(mAdapter.getItemId(offsetPosition),
+                            type, dryRun);
+                    if (holder != null) {
+                        // update position
+                        holder.mPosition = offsetPosition;
+                        fromScrapOrHiddenOrCache = true;
+                    }
+                }
+                if (holder == null && mViewCacheExtension != null) {
+                    // We are NOT sending the offsetPosition because LayoutManager does not
+                    // know it.
+                    final View view = mViewCacheExtension
+                            .getViewForPositionAndType(this, position, type);
+                    if (view != null) {
+                        holder = getChildViewHolder(view);
+                      
+                    }
+                }
+                if (holder == null) { // fallback to pool
+                    if (DEBUG) {
+                        Log.d(TAG, "tryGetViewHolderForPositionByDeadline("
+                                + position + ") fetching from shared pool");
+                    }
+                    holder = getRecycledViewPool().getRecycledView(type);
+                    if (holder != null) {
+                        holder.resetInternal();
+                        if (FORCE_INVALIDATE_DISPLAY_LIST) {
+                            invalidateDisplayListInt(holder);
+                        }
+                    }
+                }
+                if (holder == null) {
+                    long start = getNanoTime();
+                    if (deadlineNs != FOREVER_NS
+                            && !mRecyclerPool.willCreateInTime(type, start, deadlineNs)) {
+                        // abort - we have a deadline we can't meet
+                        return null;
+                    }
+                    holder = mAdapter.createViewHolder(RecyclerView.this, type);
+                    if (ALLOW_THREAD_GAP_WORK) {
+                        // only bother finding nested RV if prefetching
+                        RecyclerView innerView = findNestedRecyclerView(holder.itemView);
+                        if (innerView != null) {
+                            holder.mNestedRecyclerView = new WeakReference<>(innerView);
+                        }
+                    }
+                }
+            } 
+
+            boolean bound = false;
+            if (mState.isPreLayout() && holder.isBound()) {
+                // do not update unless we absolutely have to.
+                holder.mPreLayoutPosition = position;
+            } else if (!holder.isBound() || holder.needsUpdate() || holder.isInvalid()) {
+                if (DEBUG && holder.isRemoved()) {
+                    throw new IllegalStateException("Removed holder should be bound and it should"
+                            + " come here only in pre-layout. Holder: " + holder
+                            + exceptionLabel());
+                }
+                final int offsetPosition = mAdapterHelper.findPositionOffset(position);
+                bound = tryBindViewHolderByDeadline(holder, offsetPosition, position, deadlineNs);
+            }  
+            return holder;
+        }
+```
