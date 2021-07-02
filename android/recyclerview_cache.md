@@ -224,3 +224,124 @@ public static class RecycledViewPool {
             return holder;
         }
 ```
+
+终于到了缓存机制最核心的地方，为了方便大家阅读，我对这部分源码进行了删减，直接从官方给的注释里面看。
+
+```
+// (0) If there is a changed scrap, try to find from there
+            if (mState.isPreLayout()) {
+                holder = getChangedScrapViewForPosition(position);
+                fromScrapOrHiddenOrCache = holder != null;
+            }
+```
+
+这里面只有设置动画以后才会为true，跟咱们讲的缓存也没有多大关系，直接略过。
+
+```
+ // 1) Find by position from scrap/hidden list/cache
+            if (holder == null) {
+                holder = getScrapOrHiddenOrCachedHolderForPosition(position, dryRun);
+            }
+```
+
+这里就开始拿第一级和第二级缓存了getScrapOrHiddenOrCachedHolderForPosition（）这个方法可以深入去看以下，注意这里传的参数是position（dryRun这个参数不用管），就跟我之前说的，Scrap和Cache是根据position拿到缓存。
+
+```
+if (holder == null && mViewCacheExtension != null) {
+                    // We are NOT sending the offsetPosition because LayoutManager does not
+                    // know it.
+                    final View view = mViewCacheExtension
+                            .getViewForPositionAndType(this, position, type);
+                    if (view != null) {
+                        holder = getChildViewHolder(view);
+                      
+                    }
+                }
+```
+
+这里开始拿第三级缓存了，这里我们不自定义ViewCacheExtension就不会进入判断条件，还是那句话慎用。
+
+```
+if (holder == null) { // fallback to pool
+                    if (DEBUG) {
+                        Log.d(TAG, "tryGetViewHolderForPositionByDeadline("
+                                + position + ") fetching from shared pool");
+                    }
+                    holder = getRecycledViewPool().getRecycledView(type);
+                    if (holder != null) {
+                        holder.resetInternal();
+                        if (FORCE_INVALIDATE_DISPLAY_LIST) {
+                            invalidateDisplayListInt(holder);
+                        }
+                    }
+                }
+```
+
+这里到了第四级缓存RecycledViewPool，getRecycledViewPool().getRecycledView(type);通过type拿到ViewHolder，接着holder.resetInternal();重置ViewHolder，让其变成一个全新的ViewHolder
+
+```
+if (holder == null) {
+                    long start = getNanoTime();
+                    if (deadlineNs != FOREVER_NS
+                            && !mRecyclerPool.willCreateInTime(type, start, deadlineNs)) {
+                        // abort - we have a deadline we can't meet
+                        return null;
+                    }
+                    holder = mAdapter.createViewHolder(RecyclerView.this, type);
+                    if (ALLOW_THREAD_GAP_WORK) {
+                        // only bother finding nested RV if prefetching
+                        RecyclerView innerView = findNestedRecyclerView(holder.itemView);
+                        if (innerView != null) {
+                            holder.mNestedRecyclerView = new WeakReference<>(innerView);
+                        }
+                    }
+                }
+```
+
+到这里如果ViewHolder还为null的话，就会create view了，创建一个新的ViewHolder
+
+```
+boolean bound = false;
+            if (mState.isPreLayout() && holder.isBound()) {
+                // do not update unless we absolutely have to.
+                holder.mPreLayoutPosition = position;
+            } else if (!holder.isBound() || holder.needsUpdate() || holder.isInvalid()) {
+                if (DEBUG && holder.isRemoved()) {
+                    throw new IllegalStateException("Removed holder should be bound and it should"
+                            + " come here only in pre-layout. Holder: " + holder
+                            + exceptionLabel());
+                }
+                final int offsetPosition = mAdapterHelper.findPositionOffset(position);
+                bound = tryBindViewHolderByDeadline(holder, offsetPosition, position, deadlineNs);
+            }  
+```
+
+
+这里else if (!holder.isBound() || holder.needsUpdate() || holder.isInvalid())是判断这个ViewHolder是不是有效的，也就是可不可以复用，如果不可以复用就会进入tryBindViewHolderByDeadline(holder, offsetPosition, position, deadlineNs);这个方法，在这里面调用了bindViewHolder（）方法。
+点进去看一眼
+
+```
+ private boolean tryBindViewHolderByDeadline(@NonNull ViewHolder holder, int offsetPosition,
+                int position, long deadlineNs) {
+            ....................
+            mAdapter.bindViewHolder(holder, offsetPosition);
+            ....................
+            return true;
+        }
+```
+
+在点进去就到了我们熟悉的onBindViewHolder()
+
+```
+  public final void bindViewHolder(@NonNull VH holder, int position) {
+            .......................
+            onBindViewHolder(holder, position, holder.getUnmodifiedPayloads());
+           .........................
+        }
+```
+
+至此，缓存机制的整体流程就全部分析完毕了。
+
+### 小结
+
+ListView有两级缓存，分别是Active View和Scrap View，缓存的对象是ItemView；而RecyclerView有四级缓存，分别是Scrap、Cache、ViewCacheExtension和RecycledViewPool，缓存的对象是ViewHolder。Scrap和Cache分别是通过position去找ViewHolder可以直接复用；ViewCacheExtension自定义缓存，目前来说应用场景比较少却需慎用；RecycledViewPool通过type来获取ViewHolder，获取的ViewHolder是个全新，需要重新绑定数据。当你看到这里的时候，面试官再问RecyclerView的性能比ListView优化在哪里，我想你已经有答案。

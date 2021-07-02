@@ -10,6 +10,7 @@
 9. [Java类加载](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/classloader.md)
 10. [Java对象生命周期](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/java_class_lifecycle.md)
 11. [Java线程池线程复用原理](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/java_thread_pool.md)
+11. [Java基础知识](https://github.com/ZLOVE320483/DayDayUp/blob/main/java/java_basic.md)
 
 ## Kotlin
 1. [Kotlin内联函数](https://github.com/ZLOVE320483/DayDayUp/blob/main/kotlin/kotlin_inline.md)
